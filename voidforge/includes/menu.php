@@ -10,15 +10,11 @@ class Menu
     private static array $locations = [];
     private static bool $initialized = false;
 
-    /**
-     * Initialize the Menu system
-     */
     public static function init(): void
     {
         if (self::$initialized) return;
         self::$initialized = true;
         
-        // Register default locations
         self::registerLocation('primary', 'Primary Navigation');
         self::registerLocation('footer', 'Footer Menu');
     }
@@ -26,22 +22,23 @@ class Menu
     /**
      * Register a menu location (called by themes)
      */
+    /**
+     * Register a named menu location that themes can assign menus to.
+     * Call from a theme's functions.php during the 'init' action.
+     *
+     * @param string $slug Unique location identifier (e.g. 'primary')
+     * @param string $name Human-readable label shown in the menu admin
+     */
     public static function registerLocation(string $slug, string $name): void
     {
         self::$locations[$slug] = $name;
     }
 
-    /**
-     * Get all registered locations
-     */
     public static function getLocations(): array
     {
         return self::$locations;
     }
 
-    /**
-     * Get menu assigned to a location
-     */
     public static function getMenuByLocation(string $location): ?array
     {
         $table = Database::table('menus');
@@ -49,12 +46,8 @@ class Menu
         return $menu ?: null;
     }
 
-    /**
-     * Create a new menu
-     */
     public static function create(array $data): int
     {
-        // Allow filtering of menu data before creation
         $data = safe_apply_filters('pre_save_menu', $data, null);
         
         $table = Database::table('menus');
@@ -66,18 +59,13 @@ class Menu
             'created_at' => date('Y-m-d H:i:s'),
         ]);
         
-        // Fire menu created action
         safe_do_action('menu_saved', $id, $data);
         
         return $id;
     }
 
-    /**
-     * Update a menu
-     */
     public static function update(int $id, array $data): bool
     {
-        // Allow filtering of menu data before update
         $data = safe_apply_filters('pre_save_menu', $data, $id);
         
         $table = Database::table('menus');
@@ -102,9 +90,6 @@ class Menu
         return $result;
     }
 
-    /**
-     * Delete a menu and its items
-     */
     public static function delete(int $id): bool
     {
         $menu = self::find($id);
@@ -128,18 +113,12 @@ class Menu
         return $result;
     }
 
-    /**
-     * Get a menu by ID
-     */
     public static function find(int $id): ?array
     {
         $table = Database::table('menus');
         return Database::queryOne("SELECT * FROM {$table} WHERE id = ?", [$id]);
     }
 
-    /**
-     * Get all menus
-     */
     public static function getAll(): array
     {
         $table = Database::table('menus');
@@ -147,7 +126,18 @@ class Menu
     }
 
     /**
-     * Add a menu item
+     * Add an item to a menu.
+     *
+     * @param array{
+     *   title:string,
+     *   type:'page'|'post'|'custom'|'taxonomy',
+     *   object_id?:int,
+     *   url?:string,
+     *   target?:string,
+     *   parent_id?:int,
+     *   position?:int
+     * } $data
+     * @return int New menu item ID
      */
     public static function addItem(int $menuId, array $data): int
     {
@@ -174,9 +164,6 @@ class Menu
         ]);
     }
 
-    /**
-     * Update a menu item
-     */
     public static function updateItem(int $id, array $data): bool
     {
         $table = Database::table('menu_items');
@@ -192,9 +179,6 @@ class Menu
         return Database::update($table, $updateData, "id = ?", [$id]) > 0;
     }
 
-    /**
-     * Delete a menu item and its children
-     */
     public static function deleteItem(int $id): bool
     {
         $table = Database::table('menu_items');
@@ -213,9 +197,6 @@ class Menu
         return Database::delete($table, "id = ?", [$id]) > 0;
     }
 
-    /**
-     * Get menu items as hierarchical tree
-     */
     public static function getItems(int $menuId): array
     {
         $table = Database::table('menu_items');
@@ -230,9 +211,6 @@ class Menu
         return safe_apply_filters('menu_items', $tree, $menuId);
     }
 
-    /**
-     * Get flat list of menu items
-     */
     public static function getItemsFlat(int $menuId): array
     {
         $table = Database::table('menu_items');
@@ -242,9 +220,6 @@ class Menu
         );
     }
 
-    /**
-     * Build hierarchical tree from flat items
-     */
     private static function buildTree(array $items, int $parentId = 0): array
     {
         $branch = [];
@@ -260,7 +235,8 @@ class Menu
     }
 
     /**
-     * Save menu item order (from drag-and-drop)
+     * Persist a new item order for a menu, including nested parent relationships.
+     * $items is the nested array produced by the drag-and-drop UI.
      */
     public static function saveOrder(int $menuId, array $items, int $parentId = 0): void
     {
@@ -278,9 +254,6 @@ class Menu
         }
     }
 
-    /**
-     * Get the URL for a menu item
-     */
     public static function getItemUrl(array $item): string
     {
         switch ($item['type']) {
@@ -322,7 +295,16 @@ class Menu
     }
 
     /**
-     * Display a menu by location
+     * Render the menu assigned to $location as an HTML navigation string.
+     * Returns an empty string if no menu is assigned to the location.
+     *
+     * @param array{
+     *   container?:string,
+     *   container_class?:string,
+     *   menu_class?:string,
+     *   submenu_class?:string,
+     *   depth?:int
+     * } $options
      */
     public static function display(string $location, array $options = []): string
     {
@@ -334,9 +316,6 @@ class Menu
         return self::render($menu['id'], $options);
     }
 
-    /**
-     * Render a menu by ID
-     */
     public static function render(int $menuId, array $options = []): string
     {
         $items = self::getItems($menuId);
@@ -379,9 +358,6 @@ class Menu
         return $html;
     }
 
-    /**
-     * Render menu items recursively
-     */
     private static function renderItems(array $items, array $options, int $depth): string
     {
         if ($options['depth'] > 0 && $depth >= $options['depth']) {
@@ -438,9 +414,6 @@ class Menu
         return $html;
     }
 
-    /**
-     * Get available pages for menu
-     */
     public static function getAvailablePages(): array
     {
         $postsTable = Database::table('posts');
@@ -449,9 +422,6 @@ class Menu
         );
     }
 
-    /**
-     * Get available posts for menu
-     */
     public static function getAvailablePosts(): array
     {
         $postsTable = Database::table('posts');
@@ -460,9 +430,6 @@ class Menu
         );
     }
 
-    /**
-     * Get available categories for menu
-     */
     public static function getAvailableCategories(): array
     {
         // For now, return empty - categories system would need to be implemented
@@ -504,7 +471,8 @@ class Menu
     }
 
     /**
-     * Check if item already exists in menu
+     * Check whether an item of a given type is already in a menu.
+     * Prevents adding the same page or post twice.
      */
     public static function itemExists(int $menuId, string $type, $objectId = null, ?string $url = null): bool
     {
@@ -526,9 +494,6 @@ class Menu
         return false;
     }
 
-    /**
-     * Duplicate a menu
-     */
     public static function duplicate(int $id): ?int
     {
         $menu = self::find($id);

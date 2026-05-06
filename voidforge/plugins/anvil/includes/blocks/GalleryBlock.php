@@ -1,11 +1,4 @@
 <?php
-/**
- * Gallery Block
- * 
- * @package VoidForge
- * @subpackage Anvil/Blocks
- */
-
 defined('CMS_ROOT') or die('Direct access not allowed');
 
 class GalleryBlock extends AnvilBlock
@@ -43,15 +36,28 @@ class GalleryBlock extends AnvilBlock
             $url = $img['url'] ?? '';
             if (!$url && !empty($img['id'])) {
                 $media = Media::find((int)$img['id']);
-                $url = $media ? Media::url($media) : '';
+                $url   = $media ? Media::url($media) : '';
             }
-            if ($url) {
-                $imagesHtml .= sprintf(
-                    '<figure class="anvil-gallery-item"><img src="%s" alt="%s"></figure>',
-                    esc($url),
-                    esc($img['alt'] ?? '')
-                );
+            if (!$url) continue;
+
+            $imgTag = sprintf(
+                '<img src="%s" alt="%s" loading="lazy">',
+                esc($url),
+                esc($img['alt'] ?? '')
+            );
+
+            // Wrap in link based on linkTo setting
+            $linkTo = $attrs['linkTo'] ?? 'none';
+            if ($linkTo === 'media') {
+                $imgTag = sprintf('<a href="%s">%s</a>', esc($url), $imgTag);
+            } elseif ($linkTo === 'custom' && !empty($img['link'])) {
+                $imgTag = sprintf('<a href="%s">%s</a>', esc($img['link']), $imgTag);
             }
+
+            $imagesHtml .= sprintf(
+                '<figure class="anvil-gallery-item">%s</figure>',
+                $imgTag
+            );
         }
         
         return sprintf(

@@ -1,11 +1,4 @@
 <?php
-/**
- * List Block
- * 
- * @package VoidForge
- * @subpackage Anvil/Blocks
- */
-
 defined('CMS_ROOT') or die('Direct access not allowed');
 
 class ListBlock extends AnvilBlock

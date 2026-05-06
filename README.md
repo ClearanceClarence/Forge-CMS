@@ -2,7 +2,7 @@
 
 A modern, lightweight content management system built with pure PHP. No frameworks, no bloat — just powerful features and clean code.
 
-![Version](https://img.shields.io/badge/version-0.3.1-6366f1?style=flat-square)
+![Version](https://img.shields.io/badge/version-0.3.2-6366f1?style=flat-square)
 ![PHP](https://img.shields.io/badge/PHP-8.0+-777BB4?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-10b981?style=flat-square)
 
@@ -31,12 +31,15 @@ A modern, lightweight content management system built with pure PHP. No framewor
 
 ## Features
 
-### What's New in v0.3.1
+### What's New in v0.3.2
 
-- **Home Page Redesign** — Clean light mode design with gradient accents, updated feature grid, comparison table
-- **Comments Overhaul** — Modern card design, time-ago timestamps, reply indicators, beautiful empty states
-- **Media Library Fixes** — Folder assignment bug fixed, quick delete buttons on hover
-- **Comment Form Fixes** — Correct submission URL, success/error messages, page template support
+- **Production-safe error reporting** — `display_errors` is now off by default; toggle via `VOIDFORGE_DEBUG=1` environment variable
+- **Login rate limiting** — Brute-force protection with 5-attempt lockout and session-based countdown
+- **Login CSRF protection** — Login form now issues and verifies a CSRF token
+- **Stronger file upload validation** — Detected MIME type is cross-checked against the expected type for the file's extension
+- **Salt generator cleaned up** — Now emits only the 3 constants VoidForge actually uses (`AUTH_KEY`, `SECURE_AUTH_KEY`, `NONCE_SALT`)
+- **`NONCE_SALT` now properly defined** — Was missing from config and installer; nonces were silently sharing a hardcoded fallback key across all installs
+- **Single version source of truth** — All version references now read from `CMS_VERSION` in `config.php`
 
 ### SEO Tools
 

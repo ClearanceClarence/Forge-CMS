@@ -23,9 +23,6 @@ class Comment
 
     private static ?bool $tableExists = null;
 
-    /**
-     * Check if comments table exists
-     */
     public static function tableExists(): bool
     {
         if (self::$tableExists === null) {
@@ -41,9 +38,6 @@ class Comment
         return self::$tableExists;
     }
 
-    /**
-     * Ensure comments table exists, create if not
-     */
     public static function ensureTable(): bool
     {
         if (self::tableExists()) {
@@ -81,9 +75,6 @@ class Comment
         }
     }
 
-    /**
-     * Find a comment by ID
-     */
     public static function find(int $id): ?array
     {
         if (!self::ensureTable()) {
@@ -94,7 +85,16 @@ class Comment
     }
 
     /**
-     * Get comments for a post
+     * Get comments for a specific post, optionally filtered and ordered.
+     *
+     * @param array{
+     *   status?:string,
+     *   parent_id?:int|null,
+     *   orderby?:string,
+     *   order?:string,
+     *   include_replies?:bool
+     * } $args
+     * @return array<int, array>
      */
     public static function getForPost(int $postId, array $args = []): array
     {
@@ -141,7 +141,6 @@ class Comment
             $params
         );
 
-        // Build threaded structure if getting top-level comments
         if ($args['include_replies'] && $args['parent_id'] === 0) {
             foreach ($comments as &$comment) {
                 $comment['replies'] = self::getReplies($comment['id'], $args['status']);
@@ -152,9 +151,6 @@ class Comment
         return $comments;
     }
 
-    /**
-     * Get replies to a comment (recursive)
-     */
     public static function getReplies(int $parentId, $status = self::STATUS_APPROVED, int $depth = 0): array
     {
         $maxDepth = (int) getOption('comment_max_depth', 3);
@@ -193,9 +189,6 @@ class Comment
         return $replies;
     }
 
-    /**
-     * Query comments with filters (for admin)
-     */
     public static function query(array $args = []): array
     {
         if (!self::ensureTable()) {
@@ -266,9 +259,6 @@ class Comment
         return Database::query($sql, $params);
     }
 
-    /**
-     * Count comments with filters
-     */
     public static function count(array $args = []): int
     {
         if (!self::ensureTable()) {
@@ -309,16 +299,25 @@ class Comment
         );
     }
 
-    /**
-     * Count pending comments (for admin badge)
-     */
     public static function countPending(): int
     {
         return self::count(['status' => self::STATUS_PENDING]);
     }
 
     /**
-     * Create a new comment
+     * Submit a new comment. Applies moderation rules and updates the post comment count.
+     * Fires: comment_created, comment_reply (when parent_id > 0).
+     *
+     * @param array{
+     *   post_id:int,
+     *   content:string,
+     *   author_name:string,
+     *   author_email:string,
+     *   author_ip?:string,
+     *   user_id?:int,
+     *   parent_id?:int
+     * } $data
+     * @return int|null New comment ID, or null on failure
      */
     public static function create(array $data): ?int
     {
@@ -326,7 +325,6 @@ class Comment
             return null;
         }
 
-        // Allow filtering of comment data before insertion (for spam checking, etc.)
         $data = safe_apply_filters('pre_insert_comment', $data);
         
         // If filter returns false/null, comment was rejected
@@ -365,11 +363,9 @@ class Comment
             // Update post comment count
             self::updatePostCommentCount($insertData['post_id']);
             
-            // Fire action
-            safe_do_action('comment_created', $commentId, $insertData);
+                safe_do_action('comment_created', $commentId, $insertData);
             
-            // Fire reply action if this is a reply
-            if ($insertData['parent_id'] > 0) {
+                if ($insertData['parent_id'] > 0) {
                 $parentComment = self::find($insertData['parent_id']);
                 safe_do_action('comment_reply', $commentId, $insertData, $parentComment);
             }
@@ -378,9 +374,6 @@ class Comment
         return $commentId;
     }
 
-    /**
-     * Update a comment
-     */
     public static function update(int $id, array $data): bool
     {
         $table = Database::table('comments');
@@ -421,8 +414,7 @@ class Comment
             if (isset($data['status'])) {
                 self::updatePostCommentCount($comment['post_id']);
                 
-                // Fire status changed action if status actually changed
-                $newStatus = $data['status'];
+                        $newStatus = $data['status'];
                 if ($oldStatus !== $newStatus) {
                     safe_do_action('comment_status_changed', $id, $newStatus, $oldStatus, $comment);
                 }
@@ -434,9 +426,6 @@ class Comment
         return $result !== false;
     }
 
-    /**
-     * Delete a comment permanently
-     */
     public static function delete(int $id): bool
     {
         $table = Database::table('comments');
@@ -446,7 +435,6 @@ class Comment
             return false;
         }
 
-        // Delete all replies first
         $replies = Database::query(
             "SELECT id FROM {$table} WHERE parent_id = ?",
             [$id]
@@ -466,21 +454,16 @@ class Comment
         return $result > 0;
     }
 
-    /**
-     * Delete all comments for a post
-     */
     public static function deleteByPost(int $postId): int
     {
         $table = Database::table('comments');
         
-        // Get count before deletion for return value
         $count = self::count(['post_id' => $postId]);
         
         if ($count === 0) {
             return 0;
         }
         
-        // Delete all comments for this post (including replies, which have same post_id)
         $result = Database::delete($table, 'post_id = ?', [$postId]);
         
         if ($result > 0) {
@@ -491,7 +474,8 @@ class Comment
     }
 
     /**
-     * Count orphaned comments (comments with no existing post)
+     * Count comments whose parent post no longer exists.
+     * Used to surface the "clean up orphans" prompt in the admin.
      */
     public static function countOrphaned(): int
     {
@@ -514,14 +498,18 @@ class Comment
     /**
      * Delete all orphaned comments (comments with no existing post)
      */
+    /**
+     * Permanently delete all comments whose parent post no longer exists.
+     *
+     * @return int Number of comments deleted
+     */
     public static function deleteOrphaned(): int
     {
         try {
             $commentsTable = Database::table('comments');
             $postsTable = Database::table('posts');
             
-            // Get orphaned post IDs first
-            $orphaned = Database::query(
+                $orphaned = Database::query(
                 "SELECT DISTINCT c.post_id FROM {$commentsTable} c 
                  WHERE NOT EXISTS (SELECT 1 FROM {$postsTable} p WHERE p.id = c.post_id)"
             );
@@ -546,41 +534,26 @@ class Comment
         }
     }
 
-    /**
-     * Approve a comment
-     */
     public static function approve(int $id): bool
     {
         return self::update($id, ['status' => self::STATUS_APPROVED]);
     }
 
-    /**
-     * Mark comment as spam
-     */
     public static function markSpam(int $id): bool
     {
         return self::update($id, ['status' => self::STATUS_SPAM]);
     }
 
-    /**
-     * Move comment to trash
-     */
     public static function trash(int $id): bool
     {
         return self::update($id, ['status' => self::STATUS_TRASH]);
     }
 
-    /**
-     * Restore comment from trash
-     */
     public static function restore(int $id): bool
     {
         return self::update($id, ['status' => self::STATUS_PENDING]);
     }
 
-    /**
-     * Update the comment count on a post
-     */
     public static function updatePostCommentCount(int $postId): void
     {
         $table = Database::table('comments');
@@ -594,17 +567,11 @@ class Comment
         Database::update($postsTable, ['comment_count' => $count], 'id = ?', [$postId]);
     }
 
-    /**
-     * Get the post associated with a comment
-     */
     public static function getPost(array $comment): ?array
     {
         return Post::find($comment['post_id']);
     }
 
-    /**
-     * Get the author (user) if logged in
-     */
     public static function getAuthor(array $comment): ?array
     {
         if (empty($comment['user_id'])) {
@@ -613,9 +580,6 @@ class Comment
         return User::find($comment['user_id']);
     }
 
-    /**
-     * Get author display name
-     */
     public static function getAuthorName(array $comment): string
     {
         if (!empty($comment['user_id'])) {
@@ -628,7 +592,10 @@ class Comment
     }
 
     /**
-     * Get gravatar URL for comment author
+     * Return a Gravatar URL for the comment author.
+     * Falls back to the mystery-person image (mp) when no Gravatar is registered.
+     *
+     * @param int $size Image size in pixels
      */
     public static function getGravatar(array $comment, int $size = 48): string
     {
@@ -650,17 +617,17 @@ class Comment
     }
 
     /**
-     * Check if comments are open for a post
+     * Check whether comments are open for a given post.
+     * Considers: global comments_enabled setting, per-post disable toggle,
+     * post type allowlist, and auto-close-after-days.
      */
     public static function areOpen(array $post): bool
     {
-        // Check global setting (handle string "1" or bool true)
         $enabled = getOption('comments_enabled', true);
         if (!$enabled || $enabled === '0' || $enabled === 'false') {
             return false;
         }
 
-        // Check post type setting
         $postType = $post['post_type'] ?? 'post';
         $enabledTypes = getOption('comment_post_types', ['post']);
         
@@ -678,13 +645,11 @@ class Comment
             return false;
         }
 
-        // Check post meta for individual override
         $postComments = Post::getMeta($post['id'], '_comments_enabled');
         if ($postComments === '0' || $postComments === 0) {
             return false;
         }
 
-        // Check age limit
         $closeAfter = (int) getOption('comment_close_after', 0);
         if ($closeAfter > 0) {
             $publishedAt = strtotime($post['published_at'] ?? $post['created_at']);
@@ -697,9 +662,6 @@ class Comment
         return true;
     }
 
-    /**
-     * Check if user can moderate comments
-     */
     public static function canModerate(): bool
     {
         $user = User::current();
@@ -710,7 +672,9 @@ class Comment
     }
 
     /**
-     * Validate comment data
+     * Validate comment submission data against configured rules.
+     *
+     * @return string[] List of validation error messages; empty array on success
      */
     public static function validate(array $data): array
     {
@@ -745,7 +709,6 @@ class Comment
             }
         }
 
-        // Check if registration required
         $requireRegistration = getOption('comment_require_registration', false);
         if ($requireRegistration && empty($data['user_id'])) {
             $errors[] = 'You must be logged in to comment.';
@@ -754,9 +717,6 @@ class Comment
         return $errors;
     }
 
-    /**
-     * Sanitize comment content
-     */
     public static function sanitizeContent(string $content): string
     {
         // Strip HTML tags (allow basic formatting if enabled)
@@ -782,15 +742,11 @@ class Comment
         return $content;
     }
 
-    /**
-     * Empty trash (delete old trashed comments)
-     */
     public static function emptyTrash(int $daysOld = 30): int
     {
         $table = Database::table('comments');
         $cutoff = date('Y-m-d H:i:s', strtotime("-{$daysOld} days"));
 
-        // Get post IDs first for count update
         $comments = Database::query(
             "SELECT DISTINCT post_id FROM {$table} WHERE status = ? AND created_at < ?",
             [self::STATUS_TRASH, $cutoff]
@@ -809,9 +765,6 @@ class Comment
         return $deleted;
     }
 
-    /**
-     * Get recent comments
-     */
     public static function getRecent(int $limit = 5, string $status = self::STATUS_APPROVED): array
     {
         $table = Database::table('comments');
@@ -821,9 +774,6 @@ class Comment
         );
     }
 
-    /**
-     * Bulk action on comments
-     */
     public static function bulkAction(array $ids, string $action): int
     {
         $affected = 0;

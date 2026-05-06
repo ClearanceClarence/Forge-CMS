@@ -7,7 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.3.1] - 2025-12-28
+## [0.3.2] - 2025-12-29
+
+### 🔒 Security Fixes
+
+#### Environment-Aware Error Reporting
+- **Fixed production info leak** — `display_errors` is now off by default on all installs
+- **Introduced `CMS_DEBUG` flag** — Controlled via `VOIDFORGE_DEBUG=1` environment variable; no more editing `config.php` to toggle debug mode
+- **Error logging enabled in production** — `log_errors = 1` is set when debug is off so errors are still captured server-side
+- **Installer-generated configs are production-safe** — Fresh installs no longer expose stack traces
+
+#### Login Rate Limiting
+- **Brute-force protection on login form** — After 5 failed attempts the session is locked for 5 minutes
+- **Countdown messaging** — Users see how many attempts remain and how long the lockout lasts
+- **Auto-reset on success** — Rate limit state is cleared on a successful login
+- **CSRF protection on login** — Login form now includes and verifies a CSRF token
+
+#### File Upload MIME Validation
+- **Cross-validated extension vs detected MIME** — A file renamed from `.php` to `.jpg` is now rejected; `finfo` magic-byte detection is checked against the expected MIME for the declared extension
+- **JPEG alias handling** — Both `image/jpeg` and `image/pjpeg` accepted for `.jpg`/`.jpeg`
+- **Loose MIME allowlist for office/zip formats** — `.docx`, `.xlsx`, `.zip`, `.pdf` allow the range of MIME types these formats legitimately produce across platforms
+
+#### Constant Name Cleanup
+- **Fixed mismatched salt constants** — `AUTH_SALT`/`SECURE_AUTH_SALT` in the config template were dead (nothing read them); renamed to `AUTH_KEY`/`SECURE_AUTH_KEY` to match what the installer generates
+- **Added `HASH_COST` and `SESSION_LIFETIME`** to installer-generated configs (were missing, causing fallback to undefined)
+
+### 📁 Files Modified
+
+```
+includes/
+├── config.php       # CMS_DEBUG flag, env-aware error reporting, fixed constant names
+└── migrations.php   # Version bump to 0.3.2
+
+admin/
+└── login.php        # CSRF token + session-based rate limiting
+
+install.php          # Generated config now production-safe, includes all constants
+
+```
+
+---
+
+
 
 ### 🐛 Bug Fixes
 

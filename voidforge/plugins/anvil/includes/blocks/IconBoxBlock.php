@@ -1,11 +1,4 @@
 <?php
-/**
- * Icon Box Block
- * 
- * @package VoidForge
- * @subpackage Anvil/Blocks
- */
-
 defined('CMS_ROOT') or die('Direct access not allowed');
 
 class IconBoxBlock extends AnvilBlock
@@ -80,9 +73,6 @@ class IconBoxBlock extends AnvilBlock
         );
     }
     
-    /**
-     * Get list of available icons for the editor
-     */
     public static function getAvailableIcons(): array
     {
         return array_keys(self::$icons);

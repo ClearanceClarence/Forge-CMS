@@ -27,7 +27,7 @@ if (file_exists(CMS_ROOT . '/includes/config.php')) {
 }
 
 // Define fallbacks only if config.php didn't define them
-if (!defined('CMS_VERSION')) define('CMS_VERSION', '0.2.4.1');
+if (!defined('CMS_VERSION')) define('CMS_VERSION', '0.3.2');
 if (!defined('CMS_NAME')) define('CMS_NAME', 'VoidForge CMS');
 
 if ($isInstalled) {
@@ -314,7 +314,7 @@ define('SITE_URL', " . var_export($siteUrl, true) . ");
 define('ADMIN_URL', SITE_URL . '/admin');
 
 // CMS
-define('CMS_VERSION', '0.2.4.1');
+define('CMS_VERSION', '" . CMS_VERSION . "');
 define('CMS_NAME', 'VoidForge');
 
 // Paths  
@@ -328,12 +328,25 @@ define('THEMES_URL', SITE_URL . '/themes');
 define('PLUGINS_URL', SITE_URL . '/plugins');
 
 // Security
+define('HASH_COST', 12);
 define('AUTH_KEY', '" . bin2hex(random_bytes(32)) . "');
 define('SECURE_AUTH_KEY', '" . bin2hex(random_bytes(32)) . "');
+define('NONCE_SALT', '" . bin2hex(random_bytes(32)) . "');
 define('SESSION_NAME', 'voidforge_session');
+define('SESSION_LIFETIME', 86400);
 
-// Debug
-define('CMS_DEBUG', false);
+// Debug mode — set VOIDFORGE_DEBUG=1 in your environment to enable
+define('CMS_DEBUG', (bool) (\$_ENV['VOIDFORGE_DEBUG'] ?? getenv('VOIDFORGE_DEBUG') ?? false));
+
+// Error reporting
+if (CMS_DEBUG) {
+    error_reporting(E_ALL);
+    ini_set('display_errors', '1');
+} else {
+    error_reporting(0);
+    ini_set('display_errors', '0');
+    ini_set('log_errors', '1');
+}
 ";
 
             file_put_contents(CMS_ROOT . '/includes/config.php', $configContent);

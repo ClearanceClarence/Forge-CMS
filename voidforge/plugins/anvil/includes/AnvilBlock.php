@@ -35,64 +35,44 @@ abstract class AnvilBlock
     /** @var array Supported features */
     protected static array $supports = [];
     
-    /**
-     * Get block name
-     */
     public static function getName(): string
     {
         return static::$name;
     }
     
-    /**
-     * Get block label
-     */
     public static function getLabel(): string
     {
         return static::$label;
     }
     
-    /**
-     * Get block description
-     */
     public static function getDescription(): string
     {
         return static::$description;
     }
     
-    /**
-     * Get block category
-     */
     public static function getCategory(): string
     {
         return static::$category;
     }
     
-    /**
-     * Get block icon
-     */
     public static function getIcon(): string
     {
         return static::$icon;
     }
     
-    /**
-     * Get attribute definitions
-     */
     public static function getAttributes(): array
     {
         return static::$attributes;
     }
     
-    /**
-     * Get supported features
-     */
     public static function getSupports(): array
     {
         return static::$supports;
     }
     
     /**
-     * Get complete block definition for registration
+     * Return the full block definition array used when registering with Anvil.
+     * Includes label, category, icon, attributes schema, and render callback.
      */
     public static function getDefinition(): array
     {
@@ -109,7 +89,9 @@ abstract class AnvilBlock
     }
     
     /**
-     * Register this block with Anvil
+     * Register this block class with the Anvil block registry.
+     * Called automatically by Anvil::loadDefaultBlocks() for bundled blocks.
+     * Call manually for custom blocks: MyBlock::register()
      */
     public static function register(): void
     {
@@ -120,9 +102,6 @@ abstract class AnvilBlock
         Anvil::registerBlock(static::$name, static::getDefinition());
     }
     
-    /**
-     * Build CSS classes for the block
-     */
     protected static function buildClasses(array $attrs, string $type): array
     {
         $classes = ['anvil-block', 'anvil-block-' . $type];
@@ -138,17 +117,11 @@ abstract class AnvilBlock
         return $classes;
     }
     
-    /**
-     * Build class string from array
-     */
     protected static function classString(array $classes): string
     {
         return implode(' ', array_filter($classes));
     }
     
-    /**
-     * Process inline content (basic rich text)
-     */
     protected static function processInlineContent(string $content): string
     {
         return $content;
@@ -157,6 +130,13 @@ abstract class AnvilBlock
     /**
      * Render the block to HTML
      * Each block must implement this method
+     */
+    /**
+     * Render the block to HTML. Must be implemented by every concrete block class.
+     *
+     * @param array $attrs  Block attributes (merged with defaults from $attributes schema)
+     * @param array $block  Full block data including type and raw attributes
+     * @return string       Final HTML to output; must be safe for direct echo
      */
     abstract public static function render(array $attrs, array $block): string;
 }

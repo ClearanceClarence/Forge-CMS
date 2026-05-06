@@ -1,11 +1,4 @@
 <?php
-/**
- * Accordion/FAQ Block
- * 
- * @package VoidForge
- * @subpackage Anvil/Blocks
- */
-
 defined('CMS_ROOT') or die('Direct access not allowed');
 
 class AccordionBlock extends AnvilBlock
@@ -32,8 +25,7 @@ class AccordionBlock extends AnvilBlock
         $allowMultiple = !empty($attrs['allowMultiple']);
         
         if (empty($items)) {
-            // Default items for new block
-            $items = [
+                $items = [
                 ['title' => 'Accordion Item 1', 'content' => 'Content for the first accordion item.'],
                 ['title' => 'Accordion Item 2', 'content' => 'Content for the second accordion item.'],
             ];

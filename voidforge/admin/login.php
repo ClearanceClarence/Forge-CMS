@@ -58,22 +58,54 @@ if (User::isLoggedIn()) {
 
 $error = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = trim($_POST['username'] ?? '');
-    $password = $_POST['password'] ?? '';
+// Rate limiting — track failed attempts in session
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_SECONDS = 300; // 5 minutes
 
-    if (User::login($username, $password)) {
-        $redirect = $_GET['redirect'] ?? ADMIN_URL . '/';
-        redirect($redirect);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // CSRF check
+    if (!verifyCsrf()) {
+        $error = 'Invalid security token. Please refresh the page and try again.';
     } else {
-        $error = 'Invalid username or password';
+        // Rate limit check
+        $attempts    = (int) ($_SESSION['login_attempts'] ?? 0);
+        $lockedUntil = (int) ($_SESSION['login_locked_until'] ?? 0);
+
+        if ($lockedUntil > time()) {
+            $remaining = ceil(($lockedUntil - time()) / 60);
+            $error = 'Too many failed attempts. Please wait ' . $remaining . ' minute(s) before trying again.';
+        } else {
+            // Reset stale lockout
+            if ($lockedUntil > 0) {
+                $_SESSION['login_attempts']    = 0;
+                $_SESSION['login_locked_until'] = 0;
+                $attempts = 0;
+            }
+
+            $username = trim($_POST['username'] ?? '');
+            $password = $_POST['password'] ?? '';
+
+            if (User::login($username, $password)) {
+                // Clear rate limit on success
+                unset($_SESSION['login_attempts'], $_SESSION['login_locked_until']);
+                $redirect = $_GET['redirect'] ?? ADMIN_URL . '/';
+                redirect($redirect);
+            } else {
+                $attempts++;
+                $_SESSION['login_attempts'] = $attempts;
+                if ($attempts >= LOGIN_MAX_ATTEMPTS) {
+                    $_SESSION['login_locked_until'] = time() + LOGIN_LOCKOUT_SECONDS;
+                    $error = 'Too many failed attempts. Please wait 5 minutes before trying again.';
+                } else {
+                    $remaining = LOGIN_MAX_ATTEMPTS - $attempts;
+                    $error = 'Invalid username or password. ' . $remaining . ' attempt(s) remaining.';
+                }
+            }
+        }
     }
 }
 
-$siteName = CMS_NAME;
-try {
-    $siteName = getOption('site_name', CMS_NAME);
-} catch (Exception $e) {}
+$siteName = getOption('site_name', CMS_NAME);
 
 // Get login settings - Light theme defaults
 $defaults = [
@@ -141,10 +173,7 @@ $defaults = [
     'animation_duration' => 500,
 ];
 
-$loginSettings = [];
-try {
-    $loginSettings = getOption('login_settings', []);
-} catch (Exception $e) {}
+$loginSettings = getOption('login_settings', []);
 
 $s = array_merge($defaults, $loginSettings);
 
@@ -504,6 +533,7 @@ $animDuration = (int)$s['animation_duration'] / 1000;
         <?php endif; ?>
         
         <form method="post">
+            <?= csrfField() ?>
             <div class="form-group">
                 <label>Username or Email</label>
                 <input type="text" name="username" placeholder="Enter your username" required autofocus value="<?= esc($_POST['username'] ?? '') ?>">

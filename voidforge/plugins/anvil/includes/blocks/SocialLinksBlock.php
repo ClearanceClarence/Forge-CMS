@@ -1,11 +1,4 @@
 <?php
-/**
- * Social Links Block
- * 
- * @package VoidForge
- * @subpackage Anvil/Blocks
- */
-
 defined('CMS_ROOT') or die('Direct access not allowed');
 
 class SocialLinksBlock extends AnvilBlock
@@ -69,14 +62,12 @@ class SocialLinksBlock extends AnvilBlock
             $url = $attrs[$platform] ?? '';
             if (empty($url)) continue;
             
-            // Handle email specially
-            if ($platform === 'email') {
+                if ($platform === 'email') {
                 if (!str_starts_with($url, 'mailto:')) {
                     $url = 'mailto:' . $url;
                 }
             } else {
-                // Add https:// if no protocol specified
-                if (!preg_match('/^https?:\/\//i', $url) && !str_starts_with($url, '/')) {
+                        if (!preg_match('/^https?:\/\//i', $url) && !str_starts_with($url, '/')) {
                     $url = 'https://' . $url;
                 }
             }

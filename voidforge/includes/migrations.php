@@ -372,5 +372,5 @@ if (getOption('seo_locale') === null) {
 }
 
 // Update version in options
-setOption('cms_version', '0.3.1');
+setOption('cms_version', CMS_VERSION);
 setOption('last_update', date('Y-m-d H:i:s'));

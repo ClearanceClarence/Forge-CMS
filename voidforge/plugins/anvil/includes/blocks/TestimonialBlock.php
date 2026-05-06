@@ -1,11 +1,4 @@
 <?php
-/**
- * Testimonial Block
- * 
- * @package VoidForge
- * @subpackage Anvil/Blocks
- */
-
 defined('CMS_ROOT') or die('Direct access not allowed');
 
 class TestimonialBlock extends AnvilBlock
@@ -39,7 +32,6 @@ class TestimonialBlock extends AnvilBlock
         $rating = min(5, max(0, (int)($attrs['rating'] ?? 5)));
         $style = $attrs['style'] ?? 'default';
         
-        // Generate star rating
         $starsHtml = '';
         if ($rating > 0) {
             $starsHtml = '<div class="anvil-testimonial-stars">';
@@ -52,12 +44,10 @@ class TestimonialBlock extends AnvilBlock
             $starsHtml .= '</div>';
         }
         
-        // Author image or placeholder
         $imageHtml = !empty($authorImage)
             ? '<img src="' . esc($authorImage) . '" alt="' . esc($authorName) . '" class="anvil-testimonial-avatar">'
             : '<div class="anvil-testimonial-avatar anvil-testimonial-avatar--placeholder">' . esc(substr($authorName, 0, 1)) . '</div>';
         
-        // Author meta
         $metaHtml = '<span class="anvil-testimonial-name">' . esc($authorName) . '</span>';
         if ($authorRole || $authorCompany) {
             $metaParts = array_filter([$authorRole, $authorCompany]);

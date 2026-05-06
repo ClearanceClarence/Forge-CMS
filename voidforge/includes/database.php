@@ -1,7 +1,4 @@
 <?php
-/**
- * Database Connection Class
- */
 
 defined('CMS_ROOT') or die('Direct access not allowed');
 
@@ -10,9 +7,6 @@ class Database
     /** @var PDO|null */
     private static $instance = null;
 
-    /**
-     * Check if database is configured
-     */
     public static function isConfigured(): bool
     {
         return defined('DB_NAME') && !empty(DB_NAME) && defined('DB_HOST') && !empty(DB_HOST);
@@ -21,8 +15,7 @@ class Database
     public static function getInstance(): PDO
     {
         if (self::$instance === null) {
-            // Check if database is configured
-            if (!self::isConfigured()) {
+                if (!self::isConfigured()) {
                 self::showSetupPage();
             }
             
@@ -43,9 +36,6 @@ class Database
         return self::$instance;
     }
 
-    /**
-     * Show styled setup page
-     */
     private static function showSetupPage(): void
     {
         // Calculate installer URL
@@ -234,9 +224,6 @@ class Database
         exit;
     }
 
-    /**
-     * Show styled error page
-     */
     private static function showErrorPage(string $title, string $message): void
     {
         // Calculate installer URL
@@ -408,9 +395,6 @@ class Database
         return $prefix . $name;
     }
 
-    /**
-     * Execute a query and return all results
-     */
     public static function query(string $sql, array $params = []): array
     {
         $stmt = self::getInstance()->prepare($sql);
@@ -441,9 +425,6 @@ class Database
         return $stmt->fetchColumn();
     }
 
-    /**
-     * Execute an insert/update/delete query
-     */
     public static function execute(string $sql, array $params = []): int
     {
         $stmt = self::getInstance()->prepare($sql);
@@ -451,9 +432,6 @@ class Database
         return $stmt->rowCount();
     }
 
-    /**
-     * Insert a row and return the last insert ID
-     */
     public static function insert(string $table, array $data): int
     {
         $columns = implode(', ', array_keys($data));
@@ -467,9 +445,6 @@ class Database
         return (int) self::getInstance()->lastInsertId();
     }
 
-    /**
-     * Update rows in a table
-     */
     public static function update(string $table, array $data, string $where, array $whereParams = []): int
     {
         $set = implode(' = ?, ', array_keys($data)) . ' = ?';
@@ -481,9 +456,6 @@ class Database
         return $stmt->rowCount();
     }
 
-    /**
-     * Delete rows from a table
-     */
     public static function delete(string $table, string $where, array $params = []): int
     {
         $sql = "DELETE FROM {$table} WHERE {$where}";

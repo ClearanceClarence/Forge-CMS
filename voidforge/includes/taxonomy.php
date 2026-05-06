@@ -17,9 +17,6 @@ class Taxonomy
     /** @var bool|null Tables exist cache */
     private static ?bool $_tablesExist = null;
     
-    /**
-     * Check if taxonomy tables exist
-     */
     public static function tablesExist(): bool
     {
         if (self::$_tablesExist !== null) {
@@ -38,9 +35,6 @@ class Taxonomy
         return self::$_tablesExist;
     }
 
-    /**
-     * Initialize default taxonomies and load custom ones
-     */
     public static function init(): void
     {
         if (self::$initialized) {
@@ -49,7 +43,6 @@ class Taxonomy
         
         self::$initialized = true;
         
-        // Register built-in taxonomies
         self::register('category', [
             'label' => 'Categories',
             'singular' => 'Category',
@@ -66,20 +59,15 @@ class Taxonomy
             'builtin' => true,
         ]);
         
-        // Load custom taxonomies from database
         self::loadCustomTaxonomies();
     }
     
-    /**
-     * Load custom taxonomies from database
-     */
     private static function loadCustomTaxonomies(): void
     {
         try {
             $table = Database::table('taxonomies');
             
-            // Check if table exists first
-            $pdo = Database::getInstance();
+                $pdo = Database::getInstance();
             $check = $pdo->query("SHOW TABLES LIKE '{$table}'");
             if ($check->rowCount() === 0) {
                 return; // Table doesn't exist yet
@@ -106,7 +94,10 @@ class Taxonomy
     }
     
     /**
-     * Register a taxonomy
+     * Register a taxonomy in memory (does not write to the database).
+     * Use Taxonomy::create() to persist a new custom taxonomy.
+     *
+     * @param array{label:string,singular?:string,hierarchical?:bool,post_types?:string[]} $args
      */
     public static function register(string $slug, array $args): void
     {
@@ -123,24 +114,18 @@ class Taxonomy
         self::$taxonomies[$slug] = array_merge($defaults, $args);
     }
     
-    /**
-     * Get all registered taxonomies
-     */
     public static function getAll(): array
     {
         return self::$taxonomies;
     }
     
-    /**
-     * Get a specific taxonomy
-     */
     public static function get(string $slug): ?array
     {
         return self::$taxonomies[$slug] ?? null;
     }
     
     /**
-     * Get taxonomies for a specific post type
+     * Return all taxonomies assigned to a post type, keyed by slug.
      */
     public static function getForPostType(string $postType): array
     {
@@ -153,21 +138,11 @@ class Taxonomy
         return $result;
     }
     
-    /**
-     * Check if taxonomy exists
-     */
     public static function exists(string $slug): bool
     {
         return isset(self::$taxonomies[$slug]);
     }
     
-    // =========================================================================
-    // TAXONOMY CRUD (for custom taxonomies)
-    // =========================================================================
-    
-    /**
-     * Create a custom taxonomy in database
-     */
     public static function create(array $data): int
     {
         $table = Database::table('taxonomies');
@@ -189,7 +164,6 @@ class Taxonomy
         
         $id = (int)Database::lastInsertId();
         
-        // Register immediately
         self::register($slug, [
             'label' => $data['name'],
             'singular' => $data['singular'] ?? rtrim($data['name'], 's'),
@@ -203,9 +177,6 @@ class Taxonomy
         return $id;
     }
     
-    /**
-     * Update a custom taxonomy
-     */
     public static function update(int $id, array $data): bool
     {
         $table = Database::table('taxonomies');
@@ -248,35 +219,27 @@ class Taxonomy
         return true;
     }
     
-    /**
-     * Delete a custom taxonomy and all its terms
-     */
     public static function delete(int $id): bool
     {
         $table = Database::table('taxonomies');
         $termsTable = Database::table('terms');
         $relTable = Database::table('term_relationships');
         
-        // Get taxonomy slug first
         $tax = Database::queryOne("SELECT slug FROM {$table} WHERE id = ?", [$id]);
         if (!$tax) {
             return false;
         }
         
-        // Get all term IDs for this taxonomy
         $terms = Database::query("SELECT id FROM {$termsTable} WHERE taxonomy = ?", [$tax['slug']]);
         $termIds = array_column($terms, 'id');
         
-        // Delete relationships
         if (!empty($termIds)) {
             $placeholders = implode(',', array_fill(0, count($termIds), '?'));
             Database::execute("DELETE FROM {$relTable} WHERE term_id IN ({$placeholders})", $termIds);
         }
         
-        // Delete terms
         Database::execute("DELETE FROM {$termsTable} WHERE taxonomy = ?", [$tax['slug']]);
         
-        // Delete taxonomy
         Database::execute("DELETE FROM {$table} WHERE id = ?", [$id]);
         
         // Unregister
@@ -285,9 +248,6 @@ class Taxonomy
         return true;
     }
     
-    /**
-     * Find taxonomy by ID
-     */
     public static function find(int $id): ?array
     {
         $table = Database::table('taxonomies');
@@ -300,9 +260,6 @@ class Taxonomy
         return $row;
     }
     
-    /**
-     * Get all custom taxonomies from database
-     */
     public static function getAllCustom(): array
     {
         if (!self::tablesExist()) {
@@ -323,16 +280,13 @@ class Taxonomy
         }
     }
     
-    // =========================================================================
-    // TERM CRUD
-    // =========================================================================
-    
     /**
-     * Create a term
+     * Create a new term in a taxonomy. Returns the new term ID.
+     *
+     * @param array{name:string,slug?:string,description?:string,parent_id?:int} $data
      */
     public static function createTerm(string $taxonomy, array $data): int
     {
-        // Allow filtering of term data before creation
         $data = safe_apply_filters('pre_insert_term', $data, $taxonomy);
         
         $table = Database::table('terms');
@@ -353,15 +307,11 @@ class Taxonomy
         
         $id = (int)Database::lastInsertId();
         
-        // Fire term created action
         safe_do_action('term_inserted', $id, $taxonomy, $data);
         
         return $id;
     }
     
-    /**
-     * Update a term
-     */
     public static function updateTerm(int $id, array $data): bool
     {
         $term = self::findTerm($id);
@@ -369,7 +319,6 @@ class Taxonomy
             return false;
         }
         
-        // Allow filtering of term data before update
         $data = safe_apply_filters('pre_update_term', $data, $id, $term);
         
         $table = Database::table('terms');
@@ -405,56 +354,41 @@ class Taxonomy
             $params
         );
         
-        // Fire term updated action
         safe_do_action('term_updated', $id, $data, $term);
         
         return true;
     }
     
-    /**
-     * Delete a term and its relationships
-     */
     public static function deleteTerm(int $id): bool
     {
         $table = Database::table('terms');
         $relTable = Database::table('term_relationships');
         
-        // Get term to find children
         $term = self::findTerm($id);
         if (!$term) {
             return false;
         }
         
-        // Fire pre-delete action
         safe_do_action('pre_delete_term', $id, $term);
         
         // Update children to have no parent
         Database::execute("UPDATE {$table} SET parent_id = 0 WHERE parent_id = ?", [$id]);
         
-        // Delete relationships
         Database::execute("DELETE FROM {$relTable} WHERE term_id = ?", [$id]);
         
-        // Delete term
         Database::execute("DELETE FROM {$table} WHERE id = ?", [$id]);
         
-        // Fire deleted action
         safe_do_action('term_deleted', $id, $term);
         
         return true;
     }
     
-    /**
-     * Find a term by ID
-     */
     public static function findTerm(int $id): ?array
     {
         $table = Database::table('terms');
         return Database::queryOne("SELECT * FROM {$table} WHERE id = ?", [$id]);
     }
     
-    /**
-     * Find a term by slug
-     */
     public static function findTermBySlug(string $taxonomy, string $slug): ?array
     {
         $table = Database::table('terms');
@@ -465,15 +399,17 @@ class Taxonomy
     }
     
     /**
-     * Get all terms for a taxonomy
+     * Get all terms for a taxonomy, optionally filtered.
+     *
+     * @param array{parent?:int,orderby?:string,order?:string,hide_empty?:bool} $args
+     * @return array<int, array{id:int,name:string,slug:string,count:int,parent_id:int,...}>
      */
     public static function getTerms(string $taxonomy, array $args = []): array
     {
         try {
             $table = Database::table('terms');
             
-            // Check if table exists
-            $pdo = Database::getInstance();
+                $pdo = Database::getInstance();
             $check = $pdo->query("SHOW TABLES LIKE '{$table}'");
             if ($check->rowCount() === 0) {
                 return []; // Table doesn't exist yet
@@ -509,7 +445,8 @@ class Taxonomy
     }
     
     /**
-     * Get terms as hierarchical tree (for categories)
+     * Return terms for a hierarchical taxonomy as a nested tree.
+     * Each term has a 'children' key containing its child terms recursively.
      */
     public static function getTermsTree(string $taxonomy, int $parentId = 0): array
     {
@@ -522,9 +459,6 @@ class Taxonomy
         return $terms;
     }
     
-    /**
-     * Get term count for a taxonomy
-     */
     public static function getTermCount(string $taxonomy): int
     {
         if (!self::tablesExist()) {
@@ -543,12 +477,11 @@ class Taxonomy
         }
     }
     
-    // =========================================================================
-    // POST-TERM RELATIONSHIPS
-    // =========================================================================
-    
     /**
-     * Set terms for a post (replaces existing)
+     * Replace a post's term assignments for a taxonomy entirely.
+     * Passing an empty array removes all terms for that taxonomy.
+     *
+     * @param int[] $termIds
      */
     public static function setPostTerms(int $postId, string $taxonomy, array $termIds): void
     {
@@ -559,10 +492,8 @@ class Taxonomy
         $relTable = Database::table('term_relationships');
         $termsTable = Database::table('terms');
         
-        // Get current term IDs for this post and taxonomy
         $current = self::getPostTermIds($postId, $taxonomy);
         
-        // Delete old relationships for this taxonomy
         if (!empty($current)) {
             $placeholders = implode(',', array_fill(0, count($current), '?'));
             Database::execute(
@@ -571,7 +502,6 @@ class Taxonomy
             );
         }
         
-        // Add new relationships
         foreach ($termIds as $termId) {
             $termId = (int)$termId;
             if ($termId > 0) {
@@ -585,13 +515,9 @@ class Taxonomy
         // Update term counts
         self::updateTermCounts($taxonomy);
         
-        // Fire action
         safe_do_action('post_terms_set', $postId, $taxonomy, $termIds, $current);
     }
     
-    /**
-     * Add terms to a post (without removing existing)
-     */
     public static function addPostTerms(int $postId, array $termIds): void
     {
         $relTable = Database::table('term_relationships');
@@ -609,9 +535,6 @@ class Taxonomy
         }
     }
     
-    /**
-     * Remove terms from a post
-     */
     public static function removePostTerms(int $postId, array $termIds): void
     {
         $relTable = Database::table('term_relationships');
@@ -628,7 +551,10 @@ class Taxonomy
     }
     
     /**
-     * Get terms for a post
+     * Get the terms assigned to a post.
+     *
+     * @param string|null $taxonomy Filter by a specific taxonomy, or null to return all
+     * @return array<int, array{id:int,name:string,slug:string,taxonomy:string,...}>
      */
     public static function getPostTerms(int $postId, string $taxonomy = null): array
     {
@@ -636,8 +562,7 @@ class Taxonomy
             $termsTable = Database::table('terms');
             $relTable = Database::table('term_relationships');
             
-            // Check if tables exist
-            $pdo = Database::getInstance();
+                $pdo = Database::getInstance();
             $check = $pdo->query("SHOW TABLES LIKE '{$termsTable}'");
             if ($check->rowCount() === 0) {
                 return []; // Table doesn't exist yet
@@ -661,18 +586,12 @@ class Taxonomy
         }
     }
     
-    /**
-     * Get term IDs for a post
-     */
     public static function getPostTermIds(int $postId, string $taxonomy = null): array
     {
         $terms = self::getPostTerms($postId, $taxonomy);
         return array_column($terms, 'id');
     }
     
-    /**
-     * Check if post has a specific term
-     */
     public static function postHasTerm(int $postId, int $termId): bool
     {
         $relTable = Database::table('term_relationships');
@@ -684,7 +603,10 @@ class Taxonomy
     }
     
     /**
-     * Get posts with a specific term
+     * Get posts assigned to a specific term.
+     *
+     * @param array{status?:string,limit?:int,orderby?:string,order?:string} $args
+     * @return array<int, array>
      */
     public static function getTermPosts(int $termId, array $args = []): array
     {
@@ -704,9 +626,6 @@ class Taxonomy
         return Database::query($sql, [$termId, $status, $limit, $offset]);
     }
     
-    /**
-     * Update term counts
-     */
     public static function updateTermCounts(string $taxonomy = null): void
     {
         $termsTable = Database::table('terms');
@@ -728,22 +647,12 @@ class Taxonomy
         }
     }
     
-    /**
-     * Delete all terms for a post
-     */
     public static function deletePostTerms(int $postId): void
     {
         $relTable = Database::table('term_relationships');
         Database::execute("DELETE FROM {$relTable} WHERE post_id = ?", [$postId]);
     }
     
-    // =========================================================================
-    // UTILITIES
-    // =========================================================================
-    
-    /**
-     * Generate unique taxonomy slug
-     */
     private static function generateSlug(string $name, string $customSlug = ''): string
     {
         $table = Database::table('taxonomies');
@@ -771,9 +680,6 @@ class Taxonomy
         return $slug;
     }
     
-    /**
-     * Generate unique term slug within a taxonomy
-     */
     private static function generateTermSlug(string $taxonomy, string $name, string $customSlug = ''): string
     {
         $table = Database::table('terms');
@@ -801,25 +707,16 @@ class Taxonomy
         return $slug;
     }
     
-    /**
-     * Get term URL
-     */
     public static function getTermUrl(array $term): string
     {
         return siteUrl() . '/' . $term['taxonomy'] . '/' . $term['slug'];
     }
     
-    /**
-     * Get taxonomy archive URL
-     */
     public static function getTaxonomyUrl(string $taxonomy): string
     {
         return siteUrl() . '/' . $taxonomy;
     }
     
-    /**
-     * Get breadcrumb for hierarchical term
-     */
     public static function getTermBreadcrumb(int $termId): array
     {
         $breadcrumb = [];
@@ -833,17 +730,11 @@ class Taxonomy
         return $breadcrumb;
     }
     
-    /**
-     * Get term depth in hierarchy
-     */
     public static function getTermDepth(int $termId): int
     {
         return count(self::getTermBreadcrumb($termId)) - 1;
     }
     
-    /**
-     * Get all descendant term IDs
-     */
     public static function getDescendantIds(int $termId): array
     {
         $term = self::findTerm($termId);

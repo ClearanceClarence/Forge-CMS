@@ -656,3 +656,77 @@
     display: table;
     clear: both;
 }
+
+/* Link colour via CSS custom property (set inline by block wrapper) */
+.anvil-block-wrapper a {
+    color: var(--anvil-link-color, inherit);
+}
+
+/* Responsive visibility */
+@media (min-width: 1025px) {
+    .anvil-hide-desktop { display: none !important; }
+}
+@media (min-width: 769px) and (max-width: 1024px) {
+    .anvil-hide-tablet { display: none !important; }
+}
+@media (max-width: 768px) {
+    .anvil-hide-mobile { display: none !important; }
+}
+
+/* Animation entrance classes */
+@keyframes anvil-fadeIn         { from { opacity: 0 }                              to { opacity: 1 } }
+@keyframes anvil-fadeInUp       { from { opacity: 0; transform: translateY(30px) } to { opacity: 1; transform: none } }
+@keyframes anvil-fadeInDown     { from { opacity: 0; transform: translateY(-30px)} to { opacity: 1; transform: none } }
+@keyframes anvil-fadeInLeft     { from { opacity: 0; transform: translateX(-30px)} to { opacity: 1; transform: none } }
+@keyframes anvil-fadeInRight    { from { opacity: 0; transform: translateX(30px) } to { opacity: 1; transform: none } }
+@keyframes anvil-zoomIn         { from { opacity: 0; transform: scale(0.85) }      to { opacity: 1; transform: none } }
+@keyframes anvil-zoomInUp       { from { opacity: 0; transform: scale(0.85) translateY(30px) } to { opacity: 1; transform: none } }
+@keyframes anvil-zoomInDown     { from { opacity: 0; transform: scale(0.85) translateY(-30px)} to { opacity: 1; transform: none } }
+@keyframes anvil-slideInUp      { from { transform: translateY(100%) }             to { transform: none } }
+@keyframes anvil-slideInDown    { from { transform: translateY(-100%) }            to { transform: none } }
+@keyframes anvil-slideInLeft    { from { transform: translateX(-100%) }            to { transform: none } }
+@keyframes anvil-slideInRight   { from { transform: translateX(100%) }             to { transform: none } }
+@keyframes anvil-bounceIn       { 0%{opacity:0;transform:scale(.3)} 50%{opacity:1;transform:scale(1.05)} 70%{transform:scale(.9)} 100%{transform:none} }
+@keyframes anvil-bounceInUp     { 0%{opacity:0;transform:translateY(50px)} 60%{transform:translateY(-10px)} 100%{opacity:1;transform:none} }
+@keyframes anvil-rotateIn       { from { opacity: 0; transform: rotate(-90deg) }   to { opacity: 1; transform: none } }
+@keyframes anvil-flipInX        { from { opacity: 0; transform: rotateX(-90deg) }  to { opacity: 1; transform: none } }
+@keyframes anvil-flipInY        { from { opacity: 0; transform: rotateY(-90deg) }  to { opacity: 1; transform: none } }
+
+[class*="anvil-anim-"] { animation-fill-mode: both; }
+.anvil-anim-fadeIn      { animation-name: anvil-fadeIn }
+.anvil-anim-fadeInUp    { animation-name: anvil-fadeInUp }
+.anvil-anim-fadeInDown  { animation-name: anvil-fadeInDown }
+.anvil-anim-fadeInLeft  { animation-name: anvil-fadeInLeft }
+.anvil-anim-fadeInRight { animation-name: anvil-fadeInRight }
+.anvil-anim-zoomIn      { animation-name: anvil-zoomIn }
+.anvil-anim-zoomInUp    { animation-name: anvil-zoomInUp }
+.anvil-anim-zoomInDown  { animation-name: anvil-zoomInDown }
+.anvil-anim-slideInUp   { animation-name: anvil-slideInUp }
+.anvil-anim-slideInDown { animation-name: anvil-slideInDown }
+.anvil-anim-slideInLeft { animation-name: anvil-slideInLeft }
+.anvil-anim-slideInRight{ animation-name: anvil-slideInRight }
+.anvil-anim-bounceIn    { animation-name: anvil-bounceIn }
+.anvil-anim-bounceInUp  { animation-name: anvil-bounceInUp }
+.anvil-anim-rotateIn    { animation-name: anvil-rotateIn }
+.anvil-anim-flipInX     { animation-name: anvil-flipInX }
+.anvil-anim-flipInY     { animation-name: anvil-flipInY }
+
+/* Hover effects */
+.anvil-hover-grow   { transition: transform var(--anvil-transition, 0.3s) ease; }
+.anvil-hover-grow:hover   { transform: scale(1.05) }
+.anvil-hover-shrink { transition: transform var(--anvil-transition, 0.3s) ease; }
+.anvil-hover-shrink:hover { transform: scale(0.95) }
+.anvil-hover-float  { transition: transform var(--anvil-transition, 0.3s) ease; }
+.anvil-hover-float:hover  { transform: translateY(-6px) }
+.anvil-hover-sink   { transition: transform var(--anvil-transition, 0.3s) ease; }
+.anvil-hover-sink:hover   { transform: translateY(4px) }
+.anvil-hover-rotate { transition: transform var(--anvil-transition, 0.3s) ease; }
+.anvil-hover-rotate:hover { transform: rotate(4deg) }
+.anvil-hover-pulse  { animation: anvil-hover-pulse-anim var(--anvil-transition, 0.3s) infinite alternate; }
+@keyframes anvil-hover-pulse-anim { from { transform: scale(1) } to { transform: scale(1.05) } }
+.anvil-hover-shake:hover  { animation: anvil-shake 0.4s ease; }
+.anvil-hover-wobble:hover { animation: anvil-wobble 0.5s ease; }
+.anvil-hover-buzz:hover   { animation: anvil-buzz 0.15s linear infinite; }
+@keyframes anvil-shake  { 0%,100%{transform:none} 20%{transform:translateX(-5px)} 60%{transform:translateX(5px)} }
+@keyframes anvil-wobble { 0%,100%{transform:none} 25%{transform:rotate(-3deg)} 75%{transform:rotate(3deg)} }
+@keyframes anvil-buzz   { 0%,100%{transform:none} 50%{transform:translateX(2px)} }

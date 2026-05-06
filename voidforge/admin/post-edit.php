@@ -909,18 +909,10 @@ include ADMIN_PATH . '/includes/header.php';
             <?php 
             // Revisions card - only show for existing posts
             if ($post):
-                // Wrap in try-catch in case revisions table doesn't exist yet
-                try {
-                    $revisions = Post::getRevisions($post['id'], 20);
-                    $revisionCount = Post::getRevisionCount($post['id']);
-                    $maxRevisions = Post::getMaxRevisions($postType);
-                    $revisionsEnabled = true;
-                } catch (Exception $e) {
-                    $revisions = [];
-                    $revisionCount = 0;
-                    $maxRevisions = 10;
-                    $revisionsEnabled = false;
-                }
+                $revisions       = Post::getRevisions($post['id'], 20);
+                $revisionCount   = Post::getRevisionCount($post['id']);
+                $maxRevisions    = Post::getMaxRevisions($postType);
+                $revisionsEnabled = true;
             ?>
             <div class="sidebar-card">
                 <div class="sidebar-card-header" style="display: flex; justify-content: space-between; align-items: center;">

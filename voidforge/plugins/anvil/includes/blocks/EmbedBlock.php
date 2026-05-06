@@ -1,11 +1,4 @@
 <?php
-/**
- * Embed Block
- * 
- * @package VoidForge
- * @subpackage Anvil/Blocks
- */
-
 defined('CMS_ROOT') or die('Direct access not allowed');
 
 class EmbedBlock extends AnvilBlock
@@ -47,9 +40,6 @@ class EmbedBlock extends AnvilBlock
         );
     }
     
-    /**
-     * Get embed HTML for various providers
-     */
     private static function getEmbedHtml(string $url, array $attrs): string
     {
         $aspectRatio = $attrs['aspectRatio'] ?? '16:9';

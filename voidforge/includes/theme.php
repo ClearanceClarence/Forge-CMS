@@ -10,18 +10,12 @@ class Theme
     private static array $themes = [];
     private static array $themeData = [];
     
-    /**
-     * Initialize theme system
-     */
     public static function init(): void
     {
         self::$activeTheme = getOption('active_theme', 'flavor');
         self::scanThemes();
     }
     
-    /**
-     * Scan themes directory for available themes
-     */
     public static function scanThemes(): array
     {
         self::$themes = [];
@@ -46,14 +40,10 @@ class Theme
         return self::$themes;
     }
     
-    /**
-     * Get theme header information
-     */
     public static function getThemeHeader(string $slug): ?array
     {
         $themePath = CMS_ROOT . '/themes/' . $slug;
         
-        // Check for theme.json first
         $jsonPath = $themePath . '/theme.json';
         if (file_exists($jsonPath)) {
             $json = json_decode(file_get_contents($jsonPath), true);
@@ -74,14 +64,12 @@ class Theme
             }
         }
         
-        // Check for style.css with WordPress-style header
         $stylePath = $themePath . '/style.css';
         if (file_exists($stylePath)) {
             $content = file_get_contents($stylePath, false, null, 0, 8192);
             return self::parseThemeHeader($content, $slug);
         }
         
-        // Check for index.php as minimum requirement
         if (file_exists($themePath . '/index.php')) {
             return [
                 'slug' => $slug,
@@ -101,9 +89,6 @@ class Theme
         return null;
     }
     
-    /**
-     * Parse theme header from style.css
-     */
     private static function parseThemeHeader(string $content, string $slug): array
     {
         $headers = [
@@ -137,9 +122,6 @@ class Theme
         return $data;
     }
     
-    /**
-     * Get all available themes
-     */
     public static function getThemes(): array
     {
         if (empty(self::$themes)) {
@@ -148,9 +130,6 @@ class Theme
         return self::$themes;
     }
     
-    /**
-     * Get active theme slug
-     */
     public static function getActive(): string
     {
         if (self::$activeTheme === null) {
@@ -159,18 +138,12 @@ class Theme
         return self::$activeTheme;
     }
     
-    /**
-     * Get active theme data
-     */
     public static function getActiveData(): ?array
     {
         $active = self::getActive();
         return self::$themes[$active] ?? null;
     }
     
-    /**
-     * Activate a theme
-     */
     public static function activate(string $slug): array
     {
         $themes = self::getThemes();
@@ -181,14 +154,12 @@ class Theme
         
         $theme = $themes[$slug];
         
-        // Check PHP version requirement
         if (!empty($theme['requires_php'])) {
             if (version_compare(PHP_VERSION, $theme['requires_php'], '<')) {
                 return ['success' => false, 'error' => "Theme requires PHP {$theme['requires_php']} or higher."];
             }
         }
         
-        // Check CMS version requirement
         if (!empty($theme['requires_cms'])) {
             if (version_compare(CMS_VERSION, $theme['requires_cms'], '<')) {
                 return ['success' => false, 'error' => "Theme requires VoidForge CMS {$theme['requires_cms']} or higher."];
@@ -206,7 +177,6 @@ class Theme
         self::$activeTheme = $slug;
         setOption('active_theme', $slug);
         
-        // Load theme functions
         self::loadFunctions($slug);
         
         safe_do_action('activate_theme_' . $slug);
@@ -215,27 +185,18 @@ class Theme
         return ['success' => true];
     }
     
-    /**
-     * Get theme path
-     */
     public static function getPath(string $slug = null): string
     {
         $slug = $slug ?? self::getActive();
         return CMS_ROOT . '/themes/' . $slug;
     }
     
-    /**
-     * Get theme URL
-     */
     public static function getUrl(string $slug = null): string
     {
         $slug = $slug ?? self::getActive();
         return SITE_URL . '/themes/' . $slug;
     }
     
-    /**
-     * Load theme functions.php
-     */
     public static function loadFunctions(string $slug = null): void
     {
         $slug = $slug ?? self::getActive();
@@ -246,9 +207,6 @@ class Theme
         }
     }
     
-    /**
-     * Get template file path
-     */
     public static function getTemplate(string $template, string $slug = null): ?string
     {
         $slug = $slug ?? self::getActive();
@@ -267,9 +225,6 @@ class Theme
         return null;
     }
     
-    /**
-     * Include a template file
-     */
     public static function includeTemplate(string $template, array $data = []): void
     {
         $path = self::getTemplate($template);
@@ -280,9 +235,6 @@ class Theme
         }
     }
     
-    /**
-     * Get header template
-     */
     public static function getHeader(string $name = null, array $data = []): void
     {
         $template = $name ? "header-{$name}" : 'header';
@@ -299,9 +251,6 @@ class Theme
         }
     }
     
-    /**
-     * Get footer template
-     */
     public static function getFooter(string $name = null, array $data = []): void
     {
         $template = $name ? "footer-{$name}" : 'footer';
@@ -318,9 +267,6 @@ class Theme
         }
     }
     
-    /**
-     * Get sidebar template
-     */
     public static function getSidebar(string $name = null, array $data = []): void
     {
         $template = $name ? "sidebar-{$name}" : 'sidebar';
@@ -337,9 +283,6 @@ class Theme
         }
     }
     
-    /**
-     * Get template part
-     */
     public static function getTemplatePart(string $slug, string $name = null, array $data = []): void
     {
         $templates = [];
@@ -359,18 +302,12 @@ class Theme
         }
     }
     
-    /**
-     * Check if theme has a specific template
-     */
     public static function hasTemplate(string $template, string $slug = null): bool
     {
         $slug = $slug ?? self::getActive();
         return file_exists(self::getPath($slug) . '/' . $template . '.php');
     }
     
-    /**
-     * Get screenshot URL
-     */
     public static function getScreenshot(string $slug): ?string
     {
         $path = self::getPath($slug);
@@ -384,9 +321,6 @@ class Theme
         return null;
     }
     
-    /**
-     * Delete a theme
-     */
     public static function delete(string $slug): array
     {
         if ($slug === self::getActive()) {
@@ -406,15 +340,11 @@ class Theme
         // Recursively delete directory
         self::deleteDirectory($path);
         
-        // Remove from cache
         unset(self::$themes[$slug]);
         
         return ['success' => true];
     }
     
-    /**
-     * Recursively delete a directory
-     */
     private static function deleteDirectory(string $dir): bool
     {
         if (!is_dir($dir)) {
@@ -432,94 +362,57 @@ class Theme
     }
 }
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Get theme directory path
- */
 function get_theme_path(string $slug = null): string
 {
     return Theme::getPath($slug);
 }
 
-/**
- * Get theme directory URL
- */
 function get_theme_url(string $slug = null): string
 {
     return Theme::getUrl($slug);
 }
 
-/**
- * Get active theme slug
- */
 function get_active_theme(): string
 {
     return Theme::getActive();
 }
 
-/**
- * Get header template
- */
 function get_header(string $name = null, array $data = []): void
 {
     Theme::getHeader($name, $data);
 }
 
-/**
- * Get footer template
- */
 function get_footer(string $name = null, array $data = []): void
 {
     Theme::getFooter($name, $data);
 }
 
-/**
- * Get sidebar template
- */
 function get_sidebar(string $name = null, array $data = []): void
 {
     Theme::getSidebar($name, $data);
 }
 
-/**
- * Get template part
- */
 function get_template_part(string $slug, string $name = null, array $data = []): void
 {
     Theme::getTemplatePart($slug, $name, $data);
 }
 
-/**
- * Include template with data
- */
 function get_template(string $template, array $data = []): void
 {
     Theme::includeTemplate($template, $data);
 }
 
-/**
- * Check if theme has template
- */
 function has_template(string $template): bool
 {
     return Theme::hasTemplate($template);
 }
 
-/**
- * Enqueue theme stylesheet
- */
 function enqueue_theme_style(string $handle = 'theme-style', string $file = 'style.css', array $deps = [], string $version = ''): void
 {
     $url = get_theme_url() . '/' . $file;
     enqueue_style($handle, $url, $deps, $version);
 }
 
-/**
- * Enqueue theme script
- */
 function enqueue_theme_script(string $handle, string $file, array $deps = [], string $version = '', bool $inFooter = true): void
 {
     $url = get_theme_url() . '/' . $file;

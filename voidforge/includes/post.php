@@ -1,7 +1,4 @@
 <?php
-/**
- * Post Management (Posts, Pages, and Custom Post Types)
- */
 
 defined('CMS_ROOT') or die('Direct access not allowed');
 
@@ -31,7 +28,6 @@ class Post
      */
     public static function init(): void
     {
-        // Register default post types
         self::registerType('post', [
             'label' => 'Posts',
             'singular' => 'Post',
@@ -50,13 +46,9 @@ class Post
             'hierarchical' => true,
         ]);
         
-        // Load custom post types from database
         self::loadCustomPostTypes();
     }
     
-    /**
-     * Load custom post types from database options
-     */
     private static function loadCustomPostTypes(): void
     {
         try {
@@ -87,9 +79,6 @@ class Post
         }
     }
     
-    /**
-     * Get custom fields for a post type
-     */
     public static function getCustomFields(string $type): array
     {
         $postType = self::getType($type);
@@ -97,7 +86,10 @@ class Post
     }
 
     /**
-     * Register a custom post type
+     * Register a custom post type.
+     *
+     * @param string $type URL slug for the type (e.g. 'product')
+     * @param array{label:string,singular:string,icon?:string,supports?:string[],has_archive?:bool,hierarchical?:bool,public?:bool} $args
      */
     public static function registerType(string $type, array $args): void
     {
@@ -114,24 +106,19 @@ class Post
         self::$postTypes[$type] = array_merge($defaults, $args);
     }
 
-    /**
-     * Get all registered post types
-     */
     public static function getTypes(): array
     {
         return self::$postTypes;
     }
 
-    /**
-     * Get a specific post type
-     */
     public static function getType(string $type): ?array
     {
         return self::$postTypes[$type] ?? null;
     }
 
     /**
-     * Check if post type supports a feature
+     * Check whether a post type declares support for a feature.
+     * Common features: title, editor, excerpt, author, featured_image, page_attributes
      */
     public static function typeSupports(string $type, string $feature): bool
     {
@@ -142,6 +129,11 @@ class Post
     /**
      * Find a post by ID
      * @return array|null
+     */
+    /**
+     * Find a post by primary key. Returns null if not found.
+     *
+     * @return array{id:int,title:string,slug:string,content:string,status:string,post_type:string,...}|null
      */
     public static function find(int $id)
     {
@@ -159,6 +151,11 @@ class Post
      * Find a post by slug and type
      * @return array|null
      */
+    /**
+     * Find a published (or any-status) post by slug within a given post type.
+     *
+     * @return array|null Null if no matching post exists
+     */
     public static function findBySlug(string $slug, string $type = 'post')
     {
         $table = Database::table('posts');
@@ -175,7 +172,22 @@ class Post
     }
 
     /**
-     * Query posts with filters
+     * Query posts with filtering, ordering, and pagination.
+     * Trash is excluded by default unless status is explicitly set.
+     * Filter: pre_get_posts (modify args), the_posts (modify results).
+     *
+     * @param array{
+     *   post_type?:string,
+     *   status?:string|string[],
+     *   author?:int,
+     *   parent?:int,
+     *   search?:string,
+     *   orderby?:string,
+     *   order?:'ASC'|'DESC',
+     *   limit?:int,
+     *   offset?:int
+     * } $args
+     * @return array<int, array> List of post rows
      */
     public static function query(array $args = []): array
     {
@@ -193,7 +205,6 @@ class Post
 
         $args = array_merge($defaults, $args);
         
-        // Allow filtering of query args before execution
         $args = safe_apply_filters('pre_get_posts', $args);
         
         $where = ['1=1'];
@@ -252,14 +263,15 @@ class Post
 
         $posts = Database::query($sql, $params);
         
-        // Allow filtering of query results
         $posts = safe_apply_filters('the_posts', $posts, $args);
         
         return $posts;
     }
 
     /**
-     * Count posts with filters
+     * Count posts matching the same filter args as query(), without fetching rows.
+     *
+     * @param array $args Same keys as query() except limit/offset are ignored
      */
     public static function count(array $args = []): int
     {
@@ -303,11 +315,23 @@ class Post
     }
 
     /**
-     * Create a new post
+     * Insert a new post and return the new ID.
+     * Fires: post_inserted, post_inserted_{type}. Filter: pre_insert_post.
+     *
+     * @param array{
+     *   post_type?:string,
+     *   title:string,
+     *   slug?:string,
+     *   content?:string,
+     *   status?:string,
+     *   author_id?:int,
+     *   excerpt?:string,
+     *   featured_image_id?:int
+     * } $data
+     * @return int New post ID
      */
     public static function create(array $data): int
     {
-        // Allow filtering of post data before insertion
         $data = safe_apply_filters('pre_insert_post', $data);
         
         // Handle slug - use provided slug or generate from title
@@ -343,17 +367,19 @@ class Post
             }
         }
         
-        // Fire post_inserted action
         safe_do_action('post_inserted', $id, $insertData, $data);
         
-        // Fire post type specific action
         safe_do_action('post_inserted_' . $insertData['post_type'], $id, $insertData);
 
         return $id;
     }
 
     /**
-     * Update a post
+     * Update fields on an existing post. Only supplied keys are changed.
+     * Automatically creates a revision if the post type has revisions enabled.
+     * Fires: post_updated, post_updated_{type}. Filter: pre_update_post.
+     *
+     * @return bool False if the post does not exist
      */
     public static function update(int $id, array $data): bool
     {
@@ -365,7 +391,6 @@ class Post
         // Store old status for status change detection
         $oldStatus = $post['status'];
         
-        // Allow filtering of update data
         $data = safe_apply_filters('pre_update_post', $data, $id, $post);
 
         $updateData = [
@@ -418,14 +443,11 @@ class Post
         }
         
         if ($result) {
-            // Fire post_updated action
-            safe_do_action('post_updated', $id, $updateData, $post);
+                safe_do_action('post_updated', $id, $updateData, $post);
             
-            // Fire post type specific action
-            safe_do_action('post_updated_' . $post['post_type'], $id, $updateData, $post);
+                safe_do_action('post_updated_' . $post['post_type'], $id, $updateData, $post);
             
-            // Fire status change action if status changed
-            $newStatus = $updateData['status'] ?? $oldStatus;
+                $newStatus = $updateData['status'] ?? $oldStatus;
             if ($oldStatus !== $newStatus) {
                 safe_do_action('post_status_changed', $id, $newStatus, $oldStatus, $post);
                 safe_do_action('post_status_' . $newStatus, $id, $oldStatus, $post);
@@ -436,7 +458,11 @@ class Post
     }
 
     /**
-     * Delete a post (move to trash or permanent delete)
+     * Move a post to trash, or permanently delete it.
+     * Permanent deletion also removes all meta, revisions, taxonomy terms, and comments.
+     *
+     * @param bool $permanent True to permanently delete; false (default) to soft-delete into trash
+     * @return bool False if the post does not exist
      */
     public static function delete(int $id, bool $permanent = false): bool
     {
@@ -445,30 +471,25 @@ class Post
             return false;
         }
         
-        // Fire pre_delete action (can be used to prevent deletion)
         safe_do_action('pre_delete_post', $id, $post, $permanent);
         
         if ($permanent) {
-            // Delete taxonomy terms
-            if (class_exists('Taxonomy')) {
+                if (class_exists('Taxonomy')) {
                 try {
                     Taxonomy::deletePostTerms($id);
                 } catch (Exception $e) {
                     // Taxonomy tables might not exist
                 }
             }
-            // Delete comments
-            if (class_exists('Comment')) {
+                if (class_exists('Comment')) {
                 try {
                     Comment::deleteByPost($id);
                 } catch (Exception $e) {
                     // Comments table might not exist
                 }
             }
-            // Delete meta
-            Database::delete(Database::table('postmeta'), 'post_id = ?', [$id]);
-            // Delete revisions
-            self::deleteRevisions($id);
+                Database::delete(Database::table('postmeta'), 'post_id = ?', [$id]);
+                self::deleteRevisions($id);
             
             $result = Database::delete(Database::table('posts'), 'id = ?', [$id]) > 0;
             
@@ -482,25 +503,10 @@ class Post
 
         // Soft delete: set status to trash and record trashed_at timestamp
         $table = Database::table('posts');
-        $result = false;
-        
-        // Check if trashed_at column exists (for backward compatibility)
-        try {
-            $columns = Database::query("SHOW COLUMNS FROM {$table} LIKE 'trashed_at'");
-            if (!empty($columns)) {
-                $result = Database::execute(
-                    "UPDATE {$table} SET status = ?, trashed_at = NOW(), updated_at = NOW() WHERE id = ?",
-                    [self::STATUS_TRASH, $id]
-                ) > 0;
-            }
-        } catch (Exception $e) {
-            // Fall through to simple update
-        }
-        
-        if (!$result) {
-            // Fallback for databases without trashed_at column
-            $result = self::update($id, ['status' => self::STATUS_TRASH]);
-        }
+        $result = Database::execute(
+            "UPDATE {$table} SET status = ?, trashed_at = NOW(), updated_at = NOW() WHERE id = ?",
+            [self::STATUS_TRASH, $id]
+        ) > 0;
         
         if ($result) {
             safe_do_action('post_trashed', $id, $post);
@@ -510,7 +516,9 @@ class Post
     }
 
     /**
-     * Restore from trash
+     * Restore a trashed post to draft status.
+     *
+     * @return bool False if the post does not exist
      */
     public static function restore(int $id): bool
     {
@@ -519,26 +527,11 @@ class Post
             return false;
         }
         
-        $table = Database::table('posts');
-        $result = false;
-        
-        // Check if trashed_at column exists (for backward compatibility)
-        try {
-            $columns = Database::query("SHOW COLUMNS FROM {$table} LIKE 'trashed_at'");
-            if (!empty($columns)) {
-                $result = Database::execute(
-                    "UPDATE {$table} SET status = ?, trashed_at = NULL, updated_at = NOW() WHERE id = ?",
-                    [self::STATUS_DRAFT, $id]
-                ) > 0;
-            }
-        } catch (Exception $e) {
-            // Fall through to simple update
-        }
-        
-        if (!$result) {
-            // Fallback for databases without trashed_at column
-            $result = self::update($id, ['status' => self::STATUS_DRAFT]);
-        }
+        $table  = Database::table('posts');
+        $result = Database::execute(
+            "UPDATE {$table} SET status = ?, trashed_at = NULL, updated_at = NOW() WHERE id = ?",
+            [self::STATUS_DRAFT, $id]
+        ) > 0;
         
         if ($result) {
             safe_do_action('post_restored', $id, $post);
@@ -552,11 +545,16 @@ class Post
      * @param string|null $postType Optionally limit to a specific post type
      * @return int Number of items deleted
      */
+    /**
+     * Permanently delete all items currently in the trash.
+     *
+     * @param string|null $postType Limit to a specific post type, or null for all types
+     * @return int Number of items permanently deleted
+     */
     public static function emptyTrash(?string $postType = null): int
     {
         $table = Database::table('posts');
         
-        // Get IDs of all trashed posts
         $sql = "SELECT id FROM {$table} WHERE status = ?";
         $params = [self::STATUS_TRASH];
         
@@ -586,7 +584,6 @@ class Post
         $table = Database::table('posts');
         $retentionDays = self::TRASH_RETENTION_DAYS;
         
-        // Check if trashed_at column exists
         try {
             $columns = Database::query("SHOW COLUMNS FROM {$table} LIKE 'trashed_at'");
             if (empty($columns)) {
@@ -596,7 +593,6 @@ class Post
             return 0;
         }
         
-        // Get IDs of expired trashed posts
         $posts = Database::query(
             "SELECT id FROM {$table} WHERE status = ? AND trashed_at IS NOT NULL AND trashed_at < DATE_SUB(NOW(), INTERVAL ? DAY)",
             [self::STATUS_TRASH, $retentionDays]
@@ -615,13 +611,16 @@ class Post
     /**
      * Get days remaining before a trashed post is permanently deleted
      */
+    /**
+     * Return the number of days remaining before a trashed post is auto-deleted.
+     * Returns null if the post is not in trash or has no trashed_at timestamp.
+     */
     public static function getDaysUntilDeletion(array $post): ?int
     {
         if ($post['status'] !== self::STATUS_TRASH) {
             return null;
         }
         
-        // Check if trashed_at exists and has a value
         if (empty($post['trashed_at'])) {
             return null; // Column doesn't exist or no value
         }
@@ -633,9 +632,6 @@ class Post
         return max(0, (int)$remaining);
     }
 
-    /**
-     * Get count of trashed items
-     */
     public static function getTrashCount(?string $postType = null): int
     {
         $table = Database::table('posts');
@@ -653,18 +649,16 @@ class Post
         );
     }
 
-    // =====================================================
-    // SCHEDULED PUBLISHING
-    // =====================================================
-
     /**
-     * Schedule a post for future publication
+     * Schedule a post for automatic publication at a future date/time.
+     *
+     * @param string $datetime MySQL datetime string (e.g. '2025-06-01 09:00:00')
+     * @return bool False if the post does not exist or the datetime is in the past
      */
     public static function schedule(int $id, string $datetime): bool
     {
         $table = Database::table('posts');
         
-        // Check if scheduled_at column exists
         try {
             $columns = Database::query("SHOW COLUMNS FROM {$table} LIKE 'scheduled_at'");
             if (empty($columns)) {
@@ -686,11 +680,16 @@ class Post
      * Call this on page load or via cron
      * @return int Number of posts published
      */
+    /**
+     * Publish any scheduled posts whose scheduled_at time has passed.
+     * Called on every page load as a lightweight pseudo-cron.
+     *
+     * @return int Number of posts published
+     */
     public static function publishScheduledPosts(): int
     {
         $table = Database::table('posts');
         
-        // Check if scheduled_at column exists
         try {
             $columns = Database::query("SHOW COLUMNS FROM {$table} LIKE 'scheduled_at'");
             if (empty($columns)) {
@@ -700,7 +699,6 @@ class Post
             return 0;
         }
         
-        // Get all scheduled posts that are due
         $posts = Database::query(
             "SELECT id FROM {$table} WHERE status = ? AND scheduled_at IS NOT NULL AND scheduled_at <= NOW()",
             [self::STATUS_SCHEDULED]
@@ -720,9 +718,6 @@ class Post
         return $count;
     }
 
-    /**
-     * Get scheduled posts
-     */
     public static function getScheduledPosts(?string $postType = null, int $limit = 50): array
     {
         $table = Database::table('posts');
@@ -741,9 +736,6 @@ class Post
         return Database::query($sql, $params);
     }
 
-    /**
-     * Get count of scheduled posts
-     */
     public static function getScheduledCount(?string $postType = null): int
     {
         $table = Database::table('posts');
@@ -765,6 +757,12 @@ class Post
      * Duplicate a post with all its meta and taxonomy terms
      * @return int|false New post ID or false on failure
      */
+    /**
+     * Duplicate a post — copies content, meta, and taxonomy terms.
+     * The copy is always created as a draft with "(Copy)" appended to the title.
+     *
+     * @return int|false New post ID, or false if the source post does not exist
+     */
     public static function duplicate(int $id)
     {
         $post = self::find($id);
@@ -776,7 +774,6 @@ class Post
         $newTitle = $post['title'] . ' (Copy)';
         $newSlug = uniqueSlug(slugify($newTitle), $post['post_type']);
         
-        // Create the duplicate post
         $newId = Database::insert(Database::table('posts'), [
             'post_type' => $post['post_type'],
             'title' => $newTitle,
@@ -808,12 +805,10 @@ class Post
         // Copy taxonomy terms if Taxonomy class is available
         if (class_exists('Taxonomy')) {
             try {
-                // Get all taxonomies for this post type
-                $taxonomies = Taxonomy::getForPostType($post['post_type']);
+                        $taxonomies = Taxonomy::getForPostType($post['post_type']);
                 
                 foreach ($taxonomies as $taxSlug => $taxonomy) {
-                    // Get terms assigned to original post
-                    $termIds = Taxonomy::getPostTermIds($id, $taxSlug);
+                                $termIds = Taxonomy::getPostTermIds($id, $taxSlug);
                     
                     if (!empty($termIds)) {
                         // Assign same terms to new post
@@ -831,6 +826,13 @@ class Post
     /**
      * Get post meta
      * @return mixed
+     */
+    /**
+     * Get one or all meta values for a post.
+     * Values are JSON-decoded automatically; scalars are returned as-is.
+     *
+     * @param string|null $key Specific meta key, or null to return all as an associative array
+     * @return mixed Single value when $key is given; array<string,mixed> when $key is null
      */
     public static function getMeta(int $postId, $key = null)
     {
@@ -864,11 +866,14 @@ class Post
     }
 
     /**
-     * Set post meta
+     * Set a single meta value, inserting or updating as needed.
+     * Arrays and objects are JSON-encoded automatically.
+     * Fires: post_meta_updated. Filter: pre_update_post_meta.
+     *
+     * @param mixed $value Scalar, array, or object
      */
     public static function setMeta(int $postId, string $key, $value): void
     {
-        // Allow filtering of meta value before save
         $value = safe_apply_filters('pre_update_post_meta', $value, $postId, $key);
         
         if (is_array($value) || is_object($value)) {
@@ -891,13 +896,9 @@ class Post
             ]);
         }
         
-        // Fire action after meta updated
         safe_do_action('post_meta_updated', $postId, $key, $value);
     }
 
-    /**
-     * Delete post meta
-     */
     public static function deleteMeta(int $postId, string $key): bool
     {
         safe_do_action('pre_delete_post_meta', $postId, $key);
@@ -945,9 +946,6 @@ class Post
         return Media::getUrl($media);
     }
 
-    /**
-     * Get parent pages for dropdown
-     */
     public static function getParentOptions(string $postType, $excludeId = null): array
     {
         $table = Database::table('posts');
@@ -966,7 +964,9 @@ class Post
     }
 
     /**
-     * Get permalink for a post
+     * Return the canonical frontend URL for a post.
+     * Pages use their slug directly; posts use /post/{slug}; custom types use /{type}/{slug}.
+     * Filter: the_permalink
      */
     public static function permalink(array $post): string
     {
@@ -976,7 +976,6 @@ class Post
             $url = SITE_URL . '/' . $post['post_type'] . '/' . $post['slug'];
         }
         
-        // Allow filtering of permalink
         return safe_apply_filters('the_permalink', $url, $post);
     }
 
@@ -986,6 +985,12 @@ class Post
      * @param string $direction 'prev' or 'next'
      * @param string $postType Post type to filter by
      * @return array|null
+     */
+    /**
+     * Return the previous or next published post in chronological order.
+     *
+     * @param string $direction 'prev' for older, 'next' for newer
+     * @return array|null Null if no adjacent post exists
      */
     public static function getAdjacent(int $postId, string $direction = 'prev', string $postType = 'post'): ?array
     {
@@ -999,16 +1004,14 @@ class Post
         $createdAt = $post['created_at'];
         
         if ($direction === 'prev') {
-            // Get previous post (older)
-            $sql = "SELECT * FROM {$table} 
+                $sql = "SELECT * FROM {$table} 
                     WHERE post_type = ? 
                     AND status = 'published' 
                     AND created_at < ? 
                     ORDER BY created_at DESC 
                     LIMIT 1";
         } else {
-            // Get next post (newer)
-            $sql = "SELECT * FROM {$table} 
+                $sql = "SELECT * FROM {$table} 
                     WHERE post_type = ? 
                     AND status = 'published' 
                     AND created_at > ? 
@@ -1020,22 +1023,13 @@ class Post
         return $results[0] ?? null;
     }
 
-    // =====================================================
-    // REVISION SYSTEM
-    // =====================================================
-
-    /**
-     * Get max revisions for a post type
-     */
     public static function getMaxRevisions(string $postType): int
     {
-        // Check custom post type settings
         $customTypes = getOption('custom_post_types', []);
         if (isset($customTypes[$postType]['max_revisions'])) {
             return (int) $customTypes[$postType]['max_revisions'];
         }
         
-        // Check built-in post type settings
         $builtInSettings = getOption('revision_settings', []);
         if (isset($builtInSettings[$postType])) {
             return (int) $builtInSettings[$postType];
@@ -1046,7 +1040,10 @@ class Post
     }
 
     /**
-     * Create a revision of a post (call BEFORE updating)
+     * Snapshot the current state of a post as a revision.
+     * Automatically prunes old revisions beyond the configured limit.
+     *
+     * @return int|null New revision ID, or null if the post does not exist
      */
     public static function createRevision(int $postId): ?int
     {
@@ -1062,7 +1059,6 @@ class Post
             return null;
         }
         
-        // Get the next revision number
         $table = Database::table('post_revisions');
         $lastRevision = Database::queryValue(
             "SELECT MAX(revision_number) FROM {$table} WHERE post_id = ?",
@@ -1070,10 +1066,8 @@ class Post
         );
         $revisionNumber = ($lastRevision ?? 0) + 1;
         
-        // Get current meta data
         $meta = self::getMeta($postId);
         
-        // Create the revision
         $revisionId = Database::insert($table, [
             'post_id' => $postId,
             'post_type' => $post['post_type'],
@@ -1093,9 +1087,6 @@ class Post
         return $revisionId;
     }
 
-    /**
-     * Get all revisions for a post
-     */
     public static function getRevisions(int $postId, int $limit = 50): array
     {
         $table = Database::table('post_revisions');
@@ -1112,18 +1103,12 @@ class Post
         );
     }
 
-    /**
-     * Get a specific revision
-     */
     public static function getRevision(int $revisionId): ?array
     {
         $table = Database::table('post_revisions');
         return Database::queryOne("SELECT * FROM {$table} WHERE id = ?", [$revisionId]);
     }
 
-    /**
-     * Get revision count for a post
-     */
     public static function getRevisionCount(int $postId): int
     {
         $table = Database::table('post_revisions');
@@ -1134,7 +1119,9 @@ class Post
     }
 
     /**
-     * Restore a revision to the current post
+     * Restore a post to a previous revision, saving the current state first.
+     *
+     * @return bool False if the revision does not exist
      */
     public static function restoreRevision(int $revisionId): bool
     {
@@ -1149,7 +1136,6 @@ class Post
             return false;
         }
         
-        // Create a revision of current state before restoring
         self::createRevision($postId);
         
         // Restore the post content
@@ -1172,9 +1158,6 @@ class Post
         return true;
     }
 
-    /**
-     * Delete old revisions beyond the max limit
-     */
     public static function cleanupRevisions(int $postId, int $maxRevisions): void
     {
         if ($maxRevisions <= 0) {
@@ -1183,15 +1166,13 @@ class Post
         
         $table = Database::table('post_revisions');
         
-        // Get count of revisions
         $count = Database::queryValue(
             "SELECT COUNT(*) FROM {$table} WHERE post_id = ?",
             [$postId]
         );
         
         if ($count > $maxRevisions) {
-            // Delete oldest revisions beyond the limit
-            $toDelete = $count - $maxRevisions;
+                $toDelete = $count - $maxRevisions;
             Database::execute(
                 "DELETE FROM {$table} WHERE post_id = ? ORDER BY revision_number ASC LIMIT ?",
                 [$postId, $toDelete]
@@ -1199,18 +1180,12 @@ class Post
         }
     }
 
-    /**
-     * Delete all revisions for a post
-     */
     public static function deleteRevisions(int $postId): int
     {
         $table = Database::table('post_revisions');
         return Database::delete($table, 'post_id = ?', [$postId]);
     }
 
-    /**
-     * Compare two revisions or revision with current post
-     */
     public static function compareRevisions(int $revisionId, ?int $compareToId = null): array
     {
         $revision = self::getRevision($revisionId);

@@ -35,7 +35,7 @@ $recentPosts = Post::query([
                         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
                     </svg>
                 </span>
-                <span>VoidForge CMS v0.3.1</span>
+                <span>VoidForge CMS v<?= CMS_VERSION ?></span>
                 <span class="badge-new">New</span>
             </div>
             

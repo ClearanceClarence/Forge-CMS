@@ -22,25 +22,18 @@ class Anvil
     /** @var array Registered block class names */
     private static array $blockClasses = [];
     
-    /**
-     * Initialize Anvil with default blocks and categories
-     */
     public static function init(): void
     {
         if (self::$initialized) {
             return;
         }
         
-        // Load the base block class
         require_once ANVIL_PATH . '/includes/AnvilBlock.php';
         
-        // Register default categories
         self::registerDefaultCategories();
         
-        // Load and register default blocks
         self::loadDefaultBlocks();
         
-        // Allow plugins/themes to register custom blocks
         if (class_exists('Plugin')) {
             safe_do_action('anvil_register_blocks');
         }
@@ -48,9 +41,6 @@ class Anvil
         self::$initialized = true;
     }
     
-    /**
-     * Register default categories
-     */
     private static function registerDefaultCategories(): void
     {
         self::registerCategory('text', [
@@ -78,9 +68,6 @@ class Anvil
         ]);
     }
     
-    /**
-     * Load default blocks from the blocks directory
-     */
     private static function loadDefaultBlocks(): void
     {
         $blocksDir = ANVIL_PATH . '/includes/blocks';
@@ -89,14 +76,12 @@ class Anvil
             return;
         }
         
-        // Get all PHP files in the blocks directory
         $files = glob($blocksDir . '/*Block.php');
         
         foreach ($files as $file) {
             require_once $file;
             
-            // Get class name from filename (e.g., ParagraphBlock.php -> ParagraphBlock)
-            $className = basename($file, '.php');
+                $className = basename($file, '.php');
             
             if (class_exists($className) && is_subclass_of($className, 'AnvilBlock')) {
                 $className::register();
@@ -110,6 +95,18 @@ class Anvil
      * 
      * Usage in plugins/themes:
      * Anvil::registerBlockClass(MyCustomBlock::class);
+     */
+    /**
+     * Register a custom block from a class that extends AnvilBlock.
+     * Use this in plugins or themes to add new block types.
+     *
+     * Example:
+     *   add_action('anvil_register_blocks', function() {
+     *       Anvil::registerBlockClass(MyBlock::class);
+     *   });
+     *
+     * @param string $className Fully-qualified class name extending AnvilBlock
+     * @return bool False if the class doesn't exist or doesn't extend AnvilBlock
      */
     public static function registerBlockClass(string $className): bool
     {
@@ -146,9 +143,6 @@ class Anvil
         self::$blocks[$name] = array_merge($defaults, $args);
     }
     
-    /**
-     * Unregister a block type
-     */
     public static function unregisterBlock(string $name): bool
     {
         if (isset(self::$blocks[$name])) {
@@ -159,33 +153,21 @@ class Anvil
         return false;
     }
     
-    /**
-     * Get all registered blocks
-     */
     public static function getBlocks(): array
     {
         return self::$blocks;
     }
     
-    /**
-     * Get a specific block type
-     */
     public static function getBlock(string $name): ?array
     {
         return self::$blocks[$name] ?? null;
     }
     
-    /**
-     * Get block class for a type
-     */
     public static function getBlockClass(string $name): ?string
     {
         return self::$blockClasses[$name] ?? null;
     }
     
-    /**
-     * Register a block category
-     */
     public static function registerCategory(string $slug, array $args): void
     {
         $defaults = [
@@ -197,18 +179,12 @@ class Anvil
         self::$categories[$slug] = array_merge($defaults, $args);
     }
     
-    /**
-     * Get all categories sorted by order
-     */
     public static function getCategories(): array
     {
         uasort(self::$categories, fn($a, $b) => $a['order'] <=> $b['order']);
         return self::$categories;
     }
     
-    /**
-     * Get blocks grouped by category
-     */
     public static function getBlocksByCategory(): array
     {
         $grouped = [];
@@ -230,12 +206,14 @@ class Anvil
             $grouped[$cat]['blocks'][$name] = $block;
         }
         
-        // Remove empty categories
         return array_filter($grouped, fn($g) => !empty($g['blocks']));
     }
     
     /**
-     * Parse blocks from JSON content
+     * Decode a JSON block string (as stored in the posts table) into a blocks array.
+     * Returns an empty array for invalid JSON or non-block content.
+     *
+     * @return array<int, array{id:string,type:string,attributes:array}>
      */
     public static function parseBlocks(string $json): array
     {
@@ -251,20 +229,17 @@ class Anvil
         return $data;
     }
     
-    /**
-     * Serialize blocks to JSON
-     */
     public static function serializeBlocks(array $blocks): string
     {
         return json_encode($blocks, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
     
     /**
-     * Render blocks to HTML for frontend display
+     * Render an array of block data structures to an HTML string.
+     * This is what the 'the_content' filter calls on Anvil JSON content.
      */
     public static function renderBlocks(array $blocks): string
     {
-        // Ensure blocks are initialized
         if (!self::$initialized) {
             self::init();
         }
@@ -279,7 +254,10 @@ class Anvil
     }
     
     /**
-     * Render a single block to HTML
+     * Render a single block to HTML, applying all style attributes,
+     * CSS classes, custom ID, and animation data attributes to the wrapper.
+     *
+     * @param array{type:string,attributes:array} $block
      */
     public static function renderBlock(array $block): string
     {
@@ -291,43 +269,43 @@ class Anvil
             return '<!-- Unknown block type: ' . esc($type) . ' -->';
         }
         
-        // Use render callback (from block class or custom callback)
         $content = '';
         if (is_callable($blockDef['render_callback'])) {
             $content = call_user_func($blockDef['render_callback'], $attrs, $block);
         } else {
-            // Fallback to default render
             $content = self::defaultRender($type, $attrs, $block);
         }
         
-        // Get comprehensive styles, classes, and ID
-        $styles = self::getBlockStyles($attrs);
+        $styles  = self::getBlockStyles($attrs);
         $classes = self::getBlockClasses($attrs);
-        $cssId = self::getBlockId($attrs);
-        
-        // Apply wrapper if there are any styles, classes, or ID
-        if ($styles || $classes || $cssId) {
-            $idAttr = $cssId ? ' id="' . esc($cssId) . '"' : '';
-            $classAttr = $classes ? ' class="anvil-block-wrapper ' . esc($classes) . '"' : ' class="anvil-block-wrapper"';
-            $styleAttr = $styles ? ' style="' . esc($styles) . '"' : '';
-            
-            $content = sprintf('<div%s%s%s>%s</div>', $idAttr, $classAttr, $styleAttr, $content);
+        $cssId   = self::getBlockId($attrs);
+
+        // Collect animation timing as data-attributes for the frontend JS
+        $dataAttrs = '';
+        if (!empty($attrs['animation']) && is_array($attrs['animation'])) {
+            $anim = $attrs['animation'];
+            if (!empty($anim['duration']))           $dataAttrs .= ' data-anvil-duration="'   . (int)$anim['duration']           . '"';
+            if (!empty($anim['delay']))              $dataAttrs .= ' data-anvil-delay="'      . (int)$anim['delay']              . '"';
+            if (!empty($anim['transitionDuration'])) $dataAttrs .= ' data-anvil-transition="' . (int)$anim['transitionDuration'] . '"';
+        }
+
+        if ($styles || $classes || $cssId || $dataAttrs) {
+            $idAttr    = $cssId    ? ' id="'    . esc($cssId)    . '"' : '';
+            $classAttr = $classes  ? ' class="anvil-block-wrapper ' . esc($classes) . '"' : ' class="anvil-block-wrapper"';
+            // ENT_COMPAT: escapes &, <, >, " — but NOT ' so CSS url('...') values survive intact
+            $styleAttr = $styles   ? ' style="' . htmlspecialchars($styles, ENT_COMPAT, 'UTF-8') . '"' : '';
+
+            $content = sprintf('<div%s%s%s%s>%s</div>', $idAttr, $classAttr, $styleAttr, $dataAttrs, $content);
         }
         
         return $content;
     }
     
-    /**
-     * Generate CSS style string for margin and padding
-     */
     private static function getSpacingStyle(array $attrs): string
     {
         return self::getBlockStyles($attrs);
     }
     
-    /**
-     * Generate comprehensive CSS styles from block attributes
-     */
     private static function getBlockStyles(array $attrs): string
     {
         $styles = [];
@@ -366,8 +344,10 @@ class Anvil
         // Color styles
         if (!empty($attrs['colors']) && is_array($attrs['colors'])) {
             $c = $attrs['colors'];
-            if (!empty($c['textColor'])) $styles[] = "color:{$c['textColor']}";
+            if (!empty($c['textColor']))       $styles[] = "color:{$c['textColor']}";
             if (!empty($c['backgroundColor'])) $styles[] = "background-color:{$c['backgroundColor']}";
+            // Link colour exposed as a CSS custom property; consumed by .anvil-block-wrapper a
+            if (!empty($c['linkColor']))        $styles[] = "--anvil-link-color:{$c['linkColor']}";
         }
         
         // Border styles
@@ -429,10 +409,21 @@ class Anvil
                     $styles[] = "background:radial-gradient(circle, {$c1}, {$c2})";
                 }
             } elseif ($bgType === 'image' && !empty($bg['imageUrl'])) {
-                $pos = $bg['imagePosition'] ?? 'center center';
-                $size = $bg['imageSize'] ?? 'cover';
-                $repeat = $bg['imageRepeat'] ?? 'no-repeat';
-                $styles[] = "background-image:url('{$bg['imageUrl']}')";
+                $pos    = $bg['imagePosition'] ?? 'center center';
+                $size   = $bg['imageSize']     ?? 'cover';
+                $repeat = $bg['imageRepeat']   ?? 'no-repeat';
+
+                // Overlay: stack a semi-transparent gradient on top of the image.
+                // Using the stacked-background shorthand avoids needing position:relative + child div.
+                if (!empty($bg['overlayColor'])) {
+                    $overlayRgba = self::colorToRgba(
+                        $bg['overlayColor'],
+                        (float) ($bg['overlayOpacity'] ?? 0.5)
+                    );
+                    $styles[] = "background:linear-gradient({$overlayRgba},{$overlayRgba}),url('{$bg['imageUrl']}')";
+                } else {
+                    $styles[] = "background-image:url('{$bg['imageUrl']}')";
+                }
                 $styles[] = "background-position:{$pos}";
                 $styles[] = "background-size:{$size}";
                 $styles[] = "background-repeat:{$repeat}";
@@ -476,9 +467,38 @@ class Anvil
         
         return implode(';', $styles);
     }
-    
+
     /**
-     * Get additional CSS classes from block attributes
+     * Convert a hex or rgb/rgba colour string to rgba() with a given opacity.
+     * Used to build the background-image overlay without needing a child element.
+     */
+    private static function colorToRgba(string $color, float $opacity): string
+    {
+        $opacity = max(0.0, min(1.0, $opacity));
+        $color   = trim($color);
+
+        // Already rgba — swap the alpha component
+        if (preg_match('/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i', $color, $m)) {
+            return "rgba({$m[1]},{$m[2]},{$m[3]},{$opacity})";
+        }
+
+        // Hex — #rgb or #rrggbb
+        $hex = ltrim($color, '#');
+        if (strlen($hex) === 3) {
+            $hex = $hex[0].$hex[0].$hex[1].$hex[1].$hex[2].$hex[2];
+        }
+        if (strlen($hex) === 6) {
+            $r = hexdec(substr($hex, 0, 2));
+            $g = hexdec(substr($hex, 2, 2));
+            $b = hexdec(substr($hex, 4, 2));
+            return "rgba({$r},{$g},{$b},{$opacity})";
+        }
+
+        // Fallback: black at given opacity
+        return "rgba(0,0,0,{$opacity})";
+    }
+
+    /**
      */
     private static function getBlockClasses(array $attrs): string
     {
@@ -505,9 +525,6 @@ class Anvil
         return implode(' ', $classes);
     }
     
-    /**
-     * Get custom CSS ID from block attributes
-     */
     private static function getBlockId(array $attrs): string
     {
         return $attrs['customAttributes']['cssId'] ?? '';
@@ -527,7 +544,6 @@ class Anvil
         
         $classStr = implode(' ', $classes);
         
-        // Basic fallback rendering
         $content = $attrs['content'] ?? '';
         
         return sprintf(
@@ -538,7 +554,11 @@ class Anvil
     }
     
     /**
-     * Convert legacy HTML content to blocks
+     * Convert legacy HTML content into an Anvil blocks array.
+     * Simple paragraph text is split into paragraph blocks;
+     * complex HTML is wrapped in a single HTML block.
+     *
+     * @return array<int, array{id:string,type:string,attributes:array}>
      */
     public static function htmlToBlocks(string $html): array
     {
@@ -549,7 +569,6 @@ class Anvil
         $blocks = [];
         $html = trim($html);
         
-        // Check if it's simple paragraphs
         if (!preg_match('/<(h[1-6]|ul|ol|blockquote|pre|table|figure|div|img|video)/i', $html)) {
             // Simple text, split by double newlines or <p> tags
             $paragraphs = preg_split('/\s*<\/p>\s*<p[^>]*>\s*|\s*<br\s*\/?>\s*<br\s*\/?>\s*|\n\n+/', $html);
@@ -576,25 +595,20 @@ class Anvil
         return $blocks;
     }
     
-    /**
-     * Convert blocks to plain HTML (for legacy compatibility)
-     */
     public static function blocksToHtml(array $blocks): string
     {
         return self::renderBlocks($blocks);
     }
     
     /**
-     * Generate a unique block ID
+     * Generate a unique block ID for a new block instance.
+     * Format: block-{16 hex chars}
      */
     public static function generateBlockId(): string
     {
         return 'block-' . bin2hex(random_bytes(8));
     }
     
-    /**
-     * Validate block data
-     */
     public static function validateBlock(array $block): bool
     {
         if (empty($block['type'])) {
@@ -609,9 +623,6 @@ class Anvil
         return true;
     }
     
-    /**
-     * Get blocks data as JSON for the editor
-     */
     public static function getEditorData(): array
     {
         return [
@@ -621,17 +632,11 @@ class Anvil
         ];
     }
     
-    /**
-     * Get list of all registered block names
-     */
     public static function getBlockNames(): array
     {
         return array_keys(self::$blocks);
     }
     
-    /**
-     * Check if a block type is registered
-     */
     public static function hasBlock(string $name): bool
     {
         return isset(self::$blocks[$name]);

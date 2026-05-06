@@ -31,6 +31,10 @@ if (!defined('INCLUDES_PATH')) {
 /**
  * Safe wrapper for Plugin::doAction - only calls if Plugin class exists
  */
+/**
+ * Fire $hook only when the Plugin class is available.
+ * Safe to call before Plugin is loaded (e.g. during database bootstrap).
+ */
 function safe_do_action(string $hook, ...$args): void
 {
     if (class_exists('Plugin')) {
@@ -40,6 +44,12 @@ function safe_do_action(string $hook, ...$args): void
 
 /**
  * Safe wrapper for Plugin::applyFilters - returns value unchanged if Plugin class doesn't exist
+ */
+/**
+ * Apply filters for $hook only when the Plugin class is available.
+ * Returns $value unchanged if Plugin is not yet loaded.
+ *
+ * @return mixed The filtered value, or $value if Plugin is unavailable
  */
 function safe_apply_filters(string $hook, $value, ...$args)
 {
@@ -51,6 +61,10 @@ function safe_apply_filters(string $hook, $value, ...$args)
 
 /**
  * Escape HTML output
+ */
+/**
+ * HTML-escape a string for safe output in HTML attributes or content.
+ * Wrapper around htmlspecialchars with ENT_QUOTES and UTF-8.
  */
 function esc(string $string): string
 {
@@ -78,6 +92,10 @@ function wp_trim_words(string $text, int $numWords = 55, string $more = '...'): 
 /**
  * Generate a URL-friendly slug
  */
+/**
+ * Convert a string to a URL-friendly slug (lowercase, hyphens, ASCII).
+ * e.g. "Hello World!" → "hello-world"
+ */
 function slugify(string $text): string
 {
     $text = preg_replace('~[^\pL\d]+~u', '-', $text);
@@ -92,6 +110,11 @@ function slugify(string $text): string
 
 /**
  * Ensure slug is unique for a post type
+ */
+/**
+ * Ensure a slug is unique within a post type, appending -2, -3, etc. if needed.
+ *
+ * @param int|null $excludeId Post ID to ignore in the uniqueness check (use when updating)
  */
 function uniqueSlug(string $slug, string $postType, $excludeId = null): string
 {
@@ -142,11 +165,23 @@ function currentUrl(): string
 /**
  * Flash messages
  */
+/**
+ * Store a one-time flash message in the session.
+ *
+ * @param string $type    Message category: success | error | warning | info
+ * @param string $message The message text
+ */
 function setFlash(string $type, string $message): void
 {
     $_SESSION['flash'][$type] = $message;
 }
 
+/**
+ * Retrieve and clear flash messages from the session.
+ *
+ * @param string|null $type Specific type to fetch, or null to return and clear all
+ * @return string|array|null Single message, all messages array, or null if none
+ */
 function getFlash(?string $type = null): mixed
 {
     if ($type !== null) {
@@ -172,6 +207,10 @@ function getGravatarUrl(string $email, int $size = 80): string
 /**
  * CSRF token handling
  */
+/**
+ * Return the current CSRF token, creating it if it does not exist yet.
+ * The token is stored in the session and rotates per-session.
+ */
 function csrfToken(): string
 {
     if (empty($_SESSION['csrf_token'])) {
@@ -180,11 +219,21 @@ function csrfToken(): string
     return $_SESSION['csrf_token'];
 }
 
+/**
+ * Output a hidden <input> field containing the CSRF token.
+ * Include inside every HTML form that submits to an admin handler.
+ */
 function csrfField(): string
 {
     return '<input type="hidden" name="csrf_token" value="' . csrfToken() . '">';
 }
 
+/**
+ * Verify a CSRF token against the session token.
+ * When $token is null, reads from $_POST['csrf_token'] or $_GET['csrf'].
+ *
+ * @param string|null $token Token to verify, or null to auto-read from the request
+ */
 function verifyCsrf(?string $token = null): bool
 {
     if ($token === null) {
@@ -241,9 +290,15 @@ function truncate(string $text, int $length = 150, string $suffix = '...'): stri
  * Get option from database
  * @return mixed
  */
+/**
+ * Retrieve a CMS option by name. Arrays and objects are JSON-decoded automatically.
+ * Filter: pre_get_option_{name}
+ *
+ * @param mixed $default Value to return when the option does not exist
+ * @return mixed
+ */
 function getOption(string $name, $default = null)
 {
-    // Allow filtering of option value before retrieval (only if Plugin class is loaded)
     if (class_exists('Plugin')) {
         $preValue = Plugin::applyFilters('pre_get_option_' . $name, null, $default);
         if ($preValue !== null) {
@@ -269,9 +324,15 @@ function getOption(string $name, $default = null)
 /**
  * Set option in database
  */
+/**
+ * Persist a CMS option. Arrays and objects are JSON-encoded automatically.
+ * Creates the option if it does not exist, updates it otherwise.
+ * Action: option_updated. Filter: pre_update_option_{name}
+ *
+ * @param mixed $value Scalar, array, or object
+ */
 function setOption(string $name, $value): void
 {
-    // Allow filtering of option value before save (only if Plugin class is loaded)
     if (class_exists('Plugin')) {
         $value = Plugin::applyFilters('pre_update_option_' . $name, $value, $name);
     }
@@ -297,7 +358,6 @@ function setOption(string $name, $value): void
         ]);
     }
     
-    // Fire option updated action (only if Plugin class is loaded)
     if (class_exists('Plugin')) {
         Plugin::doAction('option_updated', $name, $value, $oldValue);
     }
@@ -305,6 +365,9 @@ function setOption(string $name, $value): void
 
 /**
  * Delete option from database
+ */
+/**
+ * Delete a CMS option. Returns false if the option did not exist.
  */
 function deleteOption(string $name): bool
 {
@@ -324,6 +387,11 @@ function deleteOption(string $name): bool
 
 /**
  * Pagination helper
+ */
+/**
+ * Build pagination metadata for a result set.
+ *
+ * @return array{total:int,per_page:int,current_page:int,total_pages:int,has_prev:bool,has_next:bool,prev_page:int,next_page:int}
  */
 function paginate(int $total, int $perPage, int $currentPage): array
 {
@@ -380,12 +448,15 @@ function isImage(string $mimeType): bool
  * Output content with tags processed
  * Use in themes: <?= content($post['content']) ?>
  */
+/**
+ * Process and return post content for frontend output.
+ * Runs shortcodes/tags then applies the 'the_content' filter.
+ * Use in theme templates: <?= content($post['content']) ?>
+ */
 function content(string $content): string
 {
-    // Process plugin tags
     $content = process_tags($content);
     
-    // Apply content filters
     return apply_filters('the_content', $content);
 }
 
@@ -715,6 +786,12 @@ function getAdminMenuIcon(string $icon, int $size = 20): string
  * @param mixed $default Default value if field doesn't exist
  * @return mixed The field value or default
  */
+/**
+ * Get a custom field value for a post.
+ *
+ * @param mixed $default Returned when the field does not exist
+ * @return mixed Decoded value (array for repeater/group fields, scalar otherwise)
+ */
 function get_custom_field(string $key, int $postId, $default = null)
 {
     $table = Database::table('postmeta');
@@ -745,6 +822,11 @@ function get_custom_field(string $key, int $postId, $default = null)
  * @param mixed $value The value to set
  * @param int $postId The post ID
  * @return bool Success
+ */
+/**
+ * Set a custom field value. Arrays are JSON-encoded automatically.
+ *
+ * @param mixed $value Scalar, array, or object
  */
 function set_custom_field(string $key, $value, int $postId): bool
 {
@@ -888,48 +970,47 @@ function generateSecuritySalt(int $length = 64): string
 }
 
 /**
- * Generate all security salts as PHP constants
+ * Generate all security constants as PHP defines.
+ *
+ * Only emits the three constants VoidForge actually reads:
+ *   AUTH_KEY        — used by the session/auth system
+ *   SECURE_AUTH_KEY — secondary auth key
+ *   NONCE_SALT      — used by createNonce() / verifyNonce()
+ *
+ * Copy the output into your config.php.
+ * Regenerate at any time via GET /api/salts
  */
 function generateSecuritySalts(): string
 {
-    $keys = [
-        'AUTH_KEY', 'SECURE_AUTH_KEY', 'LOGGED_IN_KEY', 'NONCE_KEY',
-        'AUTH_SALT', 'SECURE_AUTH_SALT', 'LOGGED_IN_SALT', 'NONCE_SALT',
-        'SESSION_KEY', 'CSRF_KEY', 'API_KEY', 'ENCRYPTION_KEY'
-    ];
-    
+    $keys = ['AUTH_KEY', 'SECURE_AUTH_KEY', 'NONCE_SALT'];
+
     $output = "/**\n";
-    $output .= " * VoidForge CMS Security Keys and Salts\n";
+    $output .= " * VoidForge CMS Security Keys\n";
     $output .= " * Generated: " . date('Y-m-d H:i:s T') . "\n";
-    $output .= " * \n";
-    $output .= " * You can regenerate these at: " . SITE_URL . "/api/salts\n";
-    $output .= " * Copy these to your config.php file.\n";
+    $output .= " *\n";
+    $output .= " * Regenerate at: " . SITE_URL . "/api/salts\n";
+    $output .= " * Paste into your config.php and reload.\n";
     $output .= " */\n\n";
-    
+
     foreach ($keys as $key) {
-        $salt = generateSecuritySalt(64);
-        $output .= "define('" . $key . "', '" . $salt . "');\n";
+        $output .= "define('" . $key . "', '" . generateSecuritySalt(64) . "');\n";
     }
-    
+
     return $output;
 }
 
 /**
- * Generate security salts as array (for JSON API)
+ * Generate security keys as an array (used by the JSON API endpoint).
  */
 function generateSecuritySaltsArray(): array
 {
-    $keys = [
-        'AUTH_KEY', 'SECURE_AUTH_KEY', 'LOGGED_IN_KEY', 'NONCE_KEY',
-        'AUTH_SALT', 'SECURE_AUTH_SALT', 'LOGGED_IN_SALT', 'NONCE_SALT',
-        'SESSION_KEY', 'CSRF_KEY', 'API_KEY', 'ENCRYPTION_KEY'
-    ];
-    
+    $keys = ['AUTH_KEY', 'SECURE_AUTH_KEY', 'NONCE_SALT'];
+
     $salts = [];
     foreach ($keys as $key) {
         $salts[$key] = generateSecuritySalt(64);
     }
-    
+
     return $salts;
 }
 
@@ -938,63 +1019,92 @@ function generateSecuritySaltsArray(): array
 // =====================================================
 
 /**
+ * Resolve the best available salt for nonce operations.
+ * Priority: NONCE_SALT → AUTH_KEY → error (should never reach production without a real value)
+ */
+function _getNonceSalt(): string
+{
+    if (defined('NONCE_SALT') && NONCE_SALT !== '') {
+        return NONCE_SALT;
+    }
+    if (defined('AUTH_KEY') && AUTH_KEY !== '') {
+        return AUTH_KEY;
+    }
+    // Last resort — only hit on a bare config.php before installation runs
+    return 'voidforge-unset-nonce-salt-run-installer';
+}
+
+/**
  * Create a nonce (number used once) for form protection
- * 
- * @param string $action The action name for the nonce
- * @param int $lifetime Lifetime in seconds (default 12 hours)
+ *
+ * @param string $action   The action name for the nonce
+ * @param int    $lifetime Lifetime in seconds (default 12 hours)
  * @return string The nonce token
+ */
+/**
+ * Generate a time-limited, action-scoped nonce token.
+ * The token is valid for $lifetime seconds (default 12 hours) and is
+ * tied to the current user ID and action name.
+ *
+ * @param string $action   Identifies the protected operation (e.g. 'delete-post-42')
+ * @param int    $lifetime Validity window in seconds
  */
 function createNonce(string $action, int $lifetime = 43200): string
 {
-    $salt = defined('NONCE_SALT') && NONCE_SALT ? NONCE_SALT : 'voidforge_default_nonce_salt';
-    $tick = ceil(time() / $lifetime);
+    $salt   = _getNonceSalt();
+    $tick   = ceil(time() / $lifetime);
     $userId = 0;
-    
+
     if (class_exists('User')) {
         $user = User::current();
         if ($user) {
             $userId = $user['id'];
         }
     }
-    
+
     $token = hash_hmac('sha256', $tick . '|' . $action . '|' . $userId, $salt);
     return substr($token, 0, 32);
 }
 
 /**
  * Verify a nonce token
- * 
- * @param string $nonce The nonce to verify
- * @param string $action The action name for the nonce
- * @param int $lifetime Lifetime in seconds (default 12 hours)
+ *
+ * @param string $nonce    The nonce to verify
+ * @param string $action   The action name for the nonce
+ * @param int    $lifetime Lifetime in seconds (default 12 hours)
  * @return bool True if valid, false otherwise
+ */
+/**
+ * Verify a nonce previously generated by createNonce().
+ * Accepts tokens from the current or previous time window to handle
+ * edge cases where the window rolls over between generation and verification.
  */
 function verifyNonce(string $nonce, string $action, int $lifetime = 43200): bool
 {
     if (empty($nonce)) {
         return false;
     }
-    
-    $salt = defined('NONCE_SALT') && NONCE_SALT ? NONCE_SALT : 'voidforge_default_nonce_salt';
+
+    $salt   = _getNonceSalt();
     $userId = 0;
-    
+
     if (class_exists('User')) {
         $user = User::current();
         if ($user) {
             $userId = $user['id'];
         }
     }
-    
-    // Check current tick and previous tick (allows for edge case timing)
+
+    // Check current tick and previous tick (allows for edge-case timing)
     $tick = ceil(time() / $lifetime);
-    
+
     for ($i = 0; $i <= 1; $i++) {
         $expected = hash_hmac('sha256', ($tick - $i) . '|' . $action . '|' . $userId, $salt);
         if (hash_equals(substr($expected, 0, 32), $nonce)) {
             return true;
         }
     }
-    
+
     return false;
 }
 
@@ -1004,6 +1114,10 @@ function verifyNonce(string $nonce, string $action, int $lifetime = 43200): bool
 
 /**
  * Get the site URL
+ */
+/**
+ * Return the full site URL, optionally with a path appended.
+ * e.g. site_url('/about') → 'https://example.com/about'
  */
 function site_url(string $path = ''): string
 {

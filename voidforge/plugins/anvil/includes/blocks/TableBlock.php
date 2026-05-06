@@ -1,11 +1,4 @@
 <?php
-/**
- * Table Block
- * 
- * @package VoidForge
- * @subpackage Anvil/Blocks
- */
-
 defined('CMS_ROOT') or die('Direct access not allowed');
 
 class TableBlock extends AnvilBlock

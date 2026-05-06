@@ -144,11 +144,9 @@ function anvil_wrap_content_with_page_settings(string $content, int $postId): st
     
     $settings = AnvilLive::getPageSettings($postId);
     
-    // Check contentWidthFull properly (can be bool, string, or int)
     $isFull = $settings['contentWidthFull'] ?? false;
     $isFullWidth = ($isFull === true || $isFull === 'true' || $isFull === '1' || $isFull === 1);
     
-    // Check if we have any custom settings
     $hasCustomSettings = $isFullWidth || 
                          ($settings['contentWidth'] ?? '1200') !== '1200' ||
                          ($settings['paddingTop'] ?? '0') !== '0' ||
@@ -227,12 +225,10 @@ Plugin::addFilter('the_content', function(string $content, ?array $post = null) 
         return $content;
     }
     
-    // Get the post from global if not passed
     if ($post === null) {
         global $post;
     }
     
-    // Check if content is Anvil blocks (JSON)
     $isAnvilContent = false;
     if (!empty($content) && is_string($content) && isset($content[0]) && $content[0] === '[') {
         $blocks = Anvil::parseBlocks($content);
@@ -242,10 +238,53 @@ Plugin::addFilter('the_content', function(string $content, ?array $post = null) 
         }
     }
     
-    // Apply Anvil Live page settings wrapper if this was Anvil content
     if ($isAnvilContent && class_exists('AnvilLive') && !empty($post['id'])) {
         $content = anvil_wrap_content_with_page_settings($content, $post['id']);
     }
     
     return $content;
 }, 5, 2);
+
+// ============================================================================
+// Frontend JS — runs once on every page that has Anvil content.
+// Handles:
+//   • Accordion single-open mode  (data-single="true")
+//   • Animation duration/delay CSS vars from data-anvil-* attributes
+// ============================================================================
+Plugin::addAction('vf_footer', function() {
+    ?>
+<script>
+(function() {
+    'use strict';
+
+    // --- Accordion: single-open mode ---
+    // When data-single="true" is set, closing all other items when one opens.
+    document.querySelectorAll('.anvil-block-accordion[data-single="true"]').forEach(function(accordion) {
+        accordion.addEventListener('toggle', function(e) {
+            if (e.target.tagName !== 'DETAILS' || !e.target.open) return;
+            accordion.querySelectorAll('details').forEach(function(detail) {
+                if (detail !== e.target) detail.removeAttribute('open');
+            });
+        }, true); // capture phase so we see the event before the browser paints
+    });
+
+    // --- Entrance animations: read duration/delay from data attributes ---
+    // Blocks emit e.g. data-anvil-duration="800" data-anvil-delay="200"
+    // on the .anvil-block-wrapper. We convert them to CSS custom properties so
+    // the animation keyframes pick them up.
+    document.querySelectorAll('[data-anvil-duration], [data-anvil-delay]').forEach(function(el) {
+        var duration = el.getAttribute('data-anvil-duration');
+        var delay    = el.getAttribute('data-anvil-delay');
+        if (duration) el.style.setProperty('animation-duration',  duration + 'ms');
+        if (delay)    el.style.setProperty('animation-delay',     delay + 'ms');
+    });
+
+    // --- Hover transition duration ---
+    document.querySelectorAll('[data-anvil-transition]').forEach(function(el) {
+        var ms = el.getAttribute('data-anvil-transition');
+        if (ms) el.style.setProperty('--anvil-transition', ms + 'ms');
+    });
+}());
+</script>
+    <?php
+}, 20);

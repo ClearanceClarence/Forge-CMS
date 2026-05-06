@@ -28,16 +28,12 @@ class AnvilLive
     /** @var string Editor version for cache busting */
     public const VERSION = '1.1.0';
     
-    /**
-     * Initialize Anvil Live
-     */
     public static function init(): void
     {
         if (self::$initialized) {
             return;
         }
         
-        // Register hooks - use VoidForge's vf_head/vf_footer hooks
         if (class_exists('Plugin')) {
             Plugin::addAction('vf_head', [self::class, 'enqueueAssets'], 99);
             Plugin::addAction('vf_footer', [self::class, 'renderEditorUI'], 99);
@@ -46,15 +42,11 @@ class AnvilLive
             Plugin::addFilter('the_content', [self::class, 'filterContent'], 9999, 2);
         }
         
-        // Register REST endpoints for editor
         self::registerEndpoints();
         
         self::$initialized = true;
     }
     
-    /**
-     * Filter the content for Anvil Live editing
-     */
     public static function filterContent(string $content, ?array $post = null): string
     {
         if (!self::$editorMode || !self::$currentPost) {
@@ -70,7 +62,6 @@ class AnvilLive
      */
     public static function checkEditorMode(string $template = '', array $data = []): void
     {
-        // Check for anvil-live query parameter
         if (!isset($_GET['anvil-live']) || $_GET['anvil-live'] !== 'edit') {
             return;
         }
@@ -88,19 +79,16 @@ class AnvilLive
             return;
         }
         
-        // Get current post from the data array
         $post = $data['post'] ?? null;
         
         if (!$post || empty($post['id'])) {
             return;
         }
         
-        // Check edit permission for this specific post
         if ($user['role'] === 'author' && ($post['author_id'] ?? 0) !== $user['id']) {
             return;
         }
         
-        // Check if post type is available for Anvil Live
         $postType = $post['post_type'] ?? 'post';
         if (!self::isAvailable($postType)) {
             return;
@@ -120,33 +108,21 @@ class AnvilLive
         }
     }
     
-    /**
-     * Check if editor mode is active
-     */
     public static function isEditorMode(): bool
     {
         return self::$editorMode;
     }
     
-    /**
-     * Get current post being edited
-     */
     public static function getCurrentPost(): ?array
     {
         return self::$currentPost;
     }
     
-    /**
-     * Check if currently in editor mode
-     */
     public static function isEditing(): bool
     {
         return self::$editorMode;
     }
     
-    /**
-     * Enqueue editor assets
-     */
     public static function enqueueAssets(): void
     {
         if (!self::$editorMode) {
@@ -158,10 +134,8 @@ class AnvilLive
         // Output editor styles
         echo '<link rel="stylesheet" href="' . esc($baseUrl) . '/css/anvil-live.css?v=' . self::VERSION . '">' . "\n";
         
-        // Load SortableJS for drag and drop
         echo '<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>' . "\n";
         
-        // Get page settings from post meta
         $pageSettings = self::getPageSettings(self::$currentPost['id']);
         
         // Editor configuration
@@ -182,9 +156,6 @@ class AnvilLive
         </script>' . "\n";
     }
     
-    /**
-     * Get page settings for a post
-     */
     public static function getPageSettings(int $postId): array
     {
         $defaults = [
@@ -211,9 +182,6 @@ class AnvilLive
         return $defaults;
     }
     
-    /**
-     * Save page settings for a post
-     */
     public static function savePageSettings(int $postId, array $settings): bool
     {
         $allowedKeys = [
@@ -237,20 +205,15 @@ class AnvilLive
         }
     }
     
-    /**
-     * Wrap content for editing
-     */
     public static function wrapContent(string $content): string
     {
         if (!self::$editorMode || !self::$currentPost) {
             return $content;
         }
         
-        // Get blocks data from post content
         $blocksJson = self::$currentPost['content'] ?? '';
         $blocks = [];
         
-        // Check if content is JSON (block editor format)
         if (!empty($blocksJson) && is_string($blocksJson)) {
             $trimmed = trim($blocksJson);
             if (!empty($trimmed) && ($trimmed[0] === '[' || $trimmed[0] === '{')) {
@@ -263,8 +226,7 @@ class AnvilLive
         
         // If no blocks and we have HTML content, convert to paragraph block
         if (empty($blocks) && !empty($content)) {
-            // Check if Anvil has htmlToBlocks method
-            if (method_exists('Anvil', 'htmlToBlocks')) {
+                if (method_exists('Anvil', 'htmlToBlocks')) {
                 $blocks = Anvil::htmlToBlocks($content);
             } else {
                 // Fallback: wrap content in a paragraph block
@@ -276,12 +238,10 @@ class AnvilLive
             }
         }
         
-        // Get page settings and generate inline styles
         $pageSettings = self::getPageSettings(self::$currentPost['id']);
         $blocksStyle = self::generateCanvasStyle($pageSettings);
         $fullWidthClass = !empty($pageSettings['contentWidthFull']) ? ' anvil-live-full-width' : '';
         
-        // Build editable content area
         $output = '<div id="anvil-live-canvas" class="anvil-live-canvas" data-post-id="' . esc((string)self::$currentPost['id']) . '">';
         $output .= '<div class="anvil-live-blocks' . $fullWidthClass . '" id="anvil-live-blocks" style="' . esc($blocksStyle) . '">';
         
@@ -313,9 +273,6 @@ class AnvilLive
         return $output;
     }
     
-    /**
-     * Generate inline CSS for canvas based on page settings
-     */
     private static function generateCanvasStyle(array $settings): string
     {
         $styles = [];
@@ -349,7 +306,6 @@ class AnvilLive
         $mBottom = $settings['marginBottom'] ?? '0';
         $mLeft = $settings['marginLeft'] ?? 'auto';
         
-        // Build margin value
         $mTopVal = $mTop === 'auto' ? 'auto' : $mTop . $mUnit;
         $mRightVal = $mRight === 'auto' ? 'auto' : $mRight . $mUnit;
         $mBottomVal = $mBottom === 'auto' ? 'auto' : $mBottom . $mUnit;
@@ -360,9 +316,6 @@ class AnvilLive
         return implode('; ', $styles);
     }
     
-    /**
-     * Render a block in editable mode
-     */
     public static function renderEditableBlock(array $block, int $index): string
     {
         $type = $block['type'] ?? 'paragraph';
@@ -406,17 +359,11 @@ class AnvilLive
         return $output;
     }
     
-    /**
-     * Check if a block type supports inline editing
-     */
     private static function isInlineEditable(string $type): bool
     {
         return in_array($type, ['paragraph', 'heading', 'quote', 'list', 'button']);
     }
     
-    /**
-     * Render the editor UI (sidebar, toolbar, modals)
-     */
     public static function renderEditorUI(): void
     {
         if (!self::$editorMode) {
@@ -426,14 +373,10 @@ class AnvilLive
         // Include the editor UI template
         include ANVIL_PATH . '/admin/editor-ui.php';
         
-        // Load editor JavaScript
         $baseUrl = ANVIL_URL . '/assets';
         echo '<script src="' . esc($baseUrl) . '/js/anvil-live.js?v=' . self::VERSION . '"></script>' . "\n";
     }
     
-    /**
-     * Register REST API endpoints for the editor
-     */
     private static function registerEndpoints(): void
     {
         if (!class_exists('Plugin')) {
@@ -447,7 +390,6 @@ class AnvilLive
             'permission_callback' => [self::class, 'canEdit'],
         ]);
         
-        // Get block preview
         Plugin::registerRestRoute('v1', 'anvil-live/preview', [
             'methods' => ['POST'],
             'callback' => [self::class, 'handlePreview'],
@@ -462,9 +404,6 @@ class AnvilLive
         ]);
     }
     
-    /**
-     * Check if current user can edit
-     */
     public static function canEdit(): bool
     {
         $user = User::current();
@@ -475,9 +414,6 @@ class AnvilLive
         return in_array($user['role'], ['admin', 'editor', 'author']);
     }
     
-    /**
-     * Handle save request
-     */
     public static function handleSave(array $request): array
     {
         $postId = (int)($request['post_id'] ?? 0);
@@ -494,7 +430,6 @@ class AnvilLive
             return ['success' => false, 'error' => 'Post not found'];
         }
         
-        // Check permission
         $user = User::current();
         if ($user['role'] === 'author' && $post['author_id'] !== $user['id']) {
             return ['success' => false, 'error' => 'Permission denied'];
@@ -528,9 +463,6 @@ class AnvilLive
         return ['success' => false, 'error' => 'Failed to save changes'];
     }
     
-    /**
-     * Handle preview request (render a single block)
-     */
     public static function handlePreview(array $request): array
     {
         $block = $request['block'] ?? [];
@@ -539,7 +471,6 @@ class AnvilLive
             return ['success' => false, 'error' => 'Invalid block data'];
         }
         
-        // Ensure block has an ID
         if (empty($block['id'])) {
             $block['id'] = Anvil::generateBlockId();
         }
@@ -553,9 +484,6 @@ class AnvilLive
         ];
     }
     
-    /**
-     * Handle autosave request
-     */
     public static function handleAutosave(array $request): array
     {
         // Store autosave as post meta
@@ -584,17 +512,11 @@ class AnvilLive
         ];
     }
     
-    /**
-     * Get edit URL for a post
-     */
     public static function getEditUrl(array $post): string
     {
         return Post::permalink($post) . '?anvil-live=edit';
     }
     
-    /**
-     * Check if Anvil Live is available for a post type
-     */
     public static function isAvailable(string $postType): bool
     {
         // Available for all post types by default
@@ -605,7 +527,6 @@ class AnvilLive
             $allowed = ['post', 'page'];
         }
         
-        // Allow filtering
         if (class_exists('Plugin')) {
             $allowed = Plugin::applyFilters('anvil_live_post_types', $allowed);
         }
@@ -686,18 +607,15 @@ class AnvilLive
             return '';
         }
         
-        // Get current post from global context
         global $post;
         if (!$post || empty($post['id'])) {
             return '';
         }
         
-        // Check if Anvil Live is available for this post type
         if (!self::isAvailable($post['post_type'] ?? 'post')) {
             return '';
         }
         
-        // Check author permission
         if ($user['role'] === 'author' && ($post['author_id'] ?? 0) !== $user['id']) {
             return '';
         }

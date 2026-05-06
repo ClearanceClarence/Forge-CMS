@@ -52,16 +52,12 @@ class SEO
         'WebSite' => 'Website',
     ];
 
-    /**
-     * Initialize SEO system
-     */
     public static function init(): void
     {
         if (self::$initialized) {
             return;
         }
         
-        // Register hooks
         if (class_exists('Plugin')) {
             // Frontend meta tag output
             Plugin::addAction('vf_head', [self::class, 'outputMetaTags'], 1);
@@ -69,8 +65,7 @@ class SEO
             // Filter document title
             Plugin::addFilter('document_title', [self::class, 'filterDocumentTitle'], 10, 2);
             
-            // Add SEO data to post queries
-            Plugin::addFilter('the_posts', [self::class, 'addSeoDataToPosts'], 10, 2);
+                Plugin::addFilter('the_posts', [self::class, 'addSeoDataToPosts'], 10, 2);
             
             // Debug panel (shows with ?seo_debug=1 for logged-in admins)
             Plugin::addAction('vf_footer', [self::class, 'maybeOutputDebugPanel'], 999);
@@ -79,12 +74,11 @@ class SEO
         self::$initialized = true;
     }
 
-    // =========================================================================
-    // Post Meta Functions
-    // =========================================================================
-
     /**
-     * Get all SEO meta for a post
+     * Get all SEO meta values stored for a post (title, description, OG fields, etc.).
+     * Keys match the _seo_* postmeta keys without the leading underscore and prefix.
+     *
+     * @return array{title?:string,description?:string,keywords?:string,focus_keyword?:string,canonical?:string,...}
      */
     public static function getPostMeta(int $postId): array
     {
@@ -114,7 +108,8 @@ class SEO
     }
 
     /**
-     * Save SEO meta for a post
+     * Persist SEO meta fields for a post from submitted form data.
+     * Expects the same keys returned by getPostMeta().
      */
     public static function savePostMeta(int $postId, array $data): void
     {
@@ -133,9 +128,6 @@ class SEO
         }
     }
 
-    /**
-     * Add SEO data to posts from query
-     */
     public static function addSeoDataToPosts(array $posts, array $args): array
     {
         foreach ($posts as &$post) {
@@ -146,12 +138,11 @@ class SEO
         return $posts;
     }
 
-    // =========================================================================
-    // Title Generation
-    // =========================================================================
-
     /**
-     * Generate the full page title
+     * Build the full <title> string for a page, applying the configured separator and format.
+     *
+     * @param array|null  $post     Current post row, or null for the homepage
+     * @param string      $pageType Context hint: 'single' | 'archive' | 'home' | '404'
      */
     public static function generateTitle(?array $post = null, string $pageType = 'single'): string
     {
@@ -169,7 +160,6 @@ class SEO
             return $siteName . ($tagline ? " {$separator} {$tagline}" : '');
         }
         
-        // Get custom SEO title or fall back to post title
         $seoMeta = self::getPostMeta($post['id']);
         $title = !empty($seoMeta['seo_title']) ? $seoMeta['seo_title'] : ($post['title'] ?? '');
         
@@ -185,20 +175,14 @@ class SEO
         return "{$title} {$separator} {$siteName}";
     }
 
-    /**
-     * Filter for document title
-     */
     public static function filterDocumentTitle(string $title, ?array $post = null): string
     {
         return self::generateTitle($post);
     }
 
-    // =========================================================================
-    // Meta Description
-    // =========================================================================
-
     /**
-     * Generate meta description
+     * Build the meta description string for a page.
+     * Prefers the custom _seo_description, then falls back to the excerpt or content snippet.
      */
     public static function generateDescription(?array $post = null, string $pageType = 'single'): string
     {
@@ -208,7 +192,6 @@ class SEO
             return $homeDesc ?: get_site_description();
         }
         
-        // Get custom SEO description
         $seoMeta = self::getPostMeta($post['id']);
         if (!empty($seoMeta['seo_description'])) {
             return $seoMeta['seo_description'];
@@ -232,9 +215,6 @@ class SEO
         return get_site_description();
     }
 
-    /**
-     * Extract plain text from Anvil blocks JSON
-     */
     private static function extractTextFromBlocks(string $json): string
     {
         $blocks = json_decode($json, true);
@@ -257,8 +237,7 @@ class SEO
                 $text .= ' ' . strip_tags($attrs['heading']);
             }
             
-            // Handle nested blocks (columns, etc.)
-            if (!empty($block['innerBlocks'])) {
+                if (!empty($block['innerBlocks'])) {
                 $text .= ' ' . self::extractTextFromBlocks(json_encode($block['innerBlocks']));
             }
         }
@@ -266,13 +245,6 @@ class SEO
         return trim($text);
     }
 
-    // =========================================================================
-    // Open Graph
-    // =========================================================================
-
-    /**
-     * Generate Open Graph meta tags
-     */
     public static function generateOpenGraph(?array $post = null, string $pageType = 'single'): array
     {
         $og = [
@@ -335,12 +307,8 @@ class SEO
         return $og;
     }
 
-    /**
-     * Get Open Graph image for a post
-     */
     private static function getOgImage(array $post, array $seoMeta): ?array
     {
-        // Check custom OG image
         if (!empty($seoMeta['seo_og_image'])) {
             $media = Media::find((int)$seoMeta['seo_og_image']);
             if ($media) {
@@ -352,7 +320,6 @@ class SEO
             }
         }
         
-        // Check featured image
         if (!empty($post['featured_image_id'])) {
             $media = Media::find((int)$post['featured_image_id']);
             if ($media) {
@@ -373,13 +340,6 @@ class SEO
         return null;
     }
 
-    // =========================================================================
-    // Twitter Cards
-    // =========================================================================
-
-    /**
-     * Generate Twitter Card meta tags
-     */
     public static function generateTwitterCard(?array $post = null, string $pageType = 'single'): array
     {
         $twitter = [];
@@ -425,26 +385,17 @@ class SEO
         return $twitter;
     }
 
-    // =========================================================================
-    // Canonical URL
-    // =========================================================================
-
-    /**
-     * Get canonical URL for a post
-     */
     public static function getCanonicalUrl(?array $post = null): string
     {
         if ($post === null) {
             return SITE_URL;
         }
         
-        // Check for custom canonical
         $seoMeta = self::getPostMeta($post['id']);
         if (!empty($seoMeta['seo_canonical'])) {
             return $seoMeta['seo_canonical'];
         }
         
-        // Generate from post permalink
         if (class_exists('Post')) {
             return Post::permalink($post);
         }
@@ -452,16 +403,8 @@ class SEO
         return SITE_URL;
     }
 
-    // =========================================================================
-    // Robots Meta
-    // =========================================================================
-
-    /**
-     * Generate robots meta content
-     */
     public static function generateRobotsMeta(?array $post = null, string $pageType = 'single'): string
     {
-        // Check global settings first
         if (getOption('seo_noindex_site', false)) {
             return 'noindex, nofollow';
         }
@@ -471,7 +414,6 @@ class SEO
             return 'index, follow';
         }
         
-        // Check post-specific settings
         $seoMeta = self::getPostMeta($post['id']);
         $index = $seoMeta['seo_robots_index'] ?? 'index';
         $follow = $seoMeta['seo_robots_follow'] ?? 'follow';
@@ -479,13 +421,6 @@ class SEO
         return "{$index}, {$follow}";
     }
 
-    // =========================================================================
-    // JSON-LD Schema
-    // =========================================================================
-
-    /**
-     * Generate JSON-LD schema markup
-     */
     public static function generateSchema(?array $post = null, string $pageType = 'single'): array
     {
         $schemas = [];
@@ -498,7 +433,6 @@ class SEO
             'url' => SITE_URL,
         ];
         
-        // Add search action
         $websiteSchema['potentialAction'] = [
             '@type' => 'SearchAction',
             'target' => [
@@ -592,9 +526,6 @@ class SEO
         return $schemas;
     }
 
-    /**
-     * Generate breadcrumb schema
-     */
     private static function generateBreadcrumbSchema(array $post): ?array
     {
         $items = [];
@@ -637,12 +568,10 @@ class SEO
         ];
     }
 
-    // =========================================================================
-    // Meta Tag Output
-    // =========================================================================
-
     /**
-     * Output all SEO meta tags
+     * Echo all SEO meta tags for the current page into <head>.
+     * Outputs: title, description, keywords, canonical, robots, Open Graph, Twitter Cards, JSON-LD schema.
+     * Hooked to 'vf_head' automatically during SEO::init().
      */
     public static function outputMetaTags(): void
     {
@@ -651,7 +580,6 @@ class SEO
         $currentPost = $post ?? null;
         $pageType = $currentPost ? 'single' : 'home';
         
-        // Check if on homepage
         $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
         $basePath = parse_url(SITE_URL, PHP_URL_PATH) ?: '';
         $path = trim(str_replace($basePath, '', $requestUri), '/');
@@ -710,12 +638,11 @@ class SEO
         echo "<!-- /VoidForge SEO -->\n\n";
     }
 
-    // =========================================================================
-    // XML Sitemap
-    // =========================================================================
-
     /**
-     * Generate XML sitemap
+     * Generate the XML sitemap document for all published posts and taxonomy terms.
+     * Respects the seo_sitemap_post_types and seo_sitemap_taxonomies options.
+     *
+     * @return string Complete XML string ready to output with Content-Type: application/xml
      */
     public static function generateSitemap(): string
     {
@@ -725,7 +652,6 @@ class SEO
         // Homepage
         $xml .= self::sitemapUrl(SITE_URL, date('c'), 'daily', '1.0');
         
-        // Get enabled post types
         $enabledTypes = getOption('seo_sitemap_post_types', ['post', 'page']);
         if (!is_array($enabledTypes)) {
             $enabledTypes = ['post', 'page'];
@@ -776,9 +702,6 @@ class SEO
         return $xml;
     }
 
-    /**
-     * Generate a single sitemap URL entry
-     */
     private static function sitemapUrl(string $url, string $lastmod, string $changefreq, string $priority): string
     {
         return "  <url>\n" .
@@ -789,9 +712,6 @@ class SEO
                "  </url>\n";
     }
 
-    /**
-     * Generate sitemap index (for large sites)
-     */
     public static function generateSitemapIndex(): string
     {
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
@@ -814,22 +734,18 @@ class SEO
         return $xml;
     }
 
-    // =========================================================================
-    // Robots.txt
-    // =========================================================================
-
     /**
-     * Generate robots.txt content
+     * Generate the robots.txt content, using any custom text saved in settings.
+     *
+     * @return string Plain-text content ready to output with Content-Type: text/plain
      */
     public static function generateRobotsTxt(): string
     {
-        // Check for custom robots.txt
         $custom = getOption('seo_robots_txt', '');
         if (!empty($custom)) {
             return $custom;
         }
         
-        // Generate default
         $robots = "User-agent: *\n";
         $robots .= "Allow: /\n";
         $robots .= "\n";
@@ -839,7 +755,6 @@ class SEO
         $robots .= "Disallow: /includes/\n";
         $robots .= "Disallow: /plugins/\n";
         
-        // Add sitemap
         if (getOption('seo_sitemap_enabled', true)) {
             $robots .= "\n";
             $robots .= "Sitemap: " . SITE_URL . "/sitemap.xml\n";
@@ -848,12 +763,11 @@ class SEO
         return $robots;
     }
 
-    // =========================================================================
-    // SEO Analysis
-    // =========================================================================
-
     /**
-     * Analyze content for SEO score
+     * Score the SEO quality of a post and return actionable suggestions.
+     *
+     * @param array $seoMeta SEO meta as returned by getPostMeta()
+     * @return array{score:int,checks:array<array{passed:bool,message:string,weight:int}>}
      */
     public static function analyzeContent(array $post, array $seoMeta): array
     {
@@ -961,9 +875,6 @@ class SEO
         ];
     }
 
-    /**
-     * Get score color based on value
-     */
     public static function getScoreColor(int $score): string
     {
         if ($score >= 80) {
@@ -975,7 +886,8 @@ class SEO
     }
 
     /**
-     * Get score label based on value
+     * Return a human-readable label for an SEO score (0–100).
+     * 80+ → Good, 50–79 → Needs Improvement, 0–49 → Poor.
      */
     public static function getScoreLabel(int $score): string
     {
@@ -993,12 +905,10 @@ class SEO
      */
     public static function maybeOutputDebugPanel(): void
     {
-        // Check for debug parameter
         if (!isset($_GET['seo_debug']) || $_GET['seo_debug'] !== '1') {
             return;
         }
         
-        // Check if user is logged in admin
         if (!class_exists('User')) {
             return;
         }
@@ -1008,7 +918,6 @@ class SEO
             return;
         }
         
-        // Get current post/page data
         global $post;
         $pageType = 'home';
         $currentPost = null;
@@ -1018,7 +927,6 @@ class SEO
             $pageType = 'single';
         }
         
-        // Generate SEO data
         $title = self::generateTitle($currentPost, $pageType);
         $description = self::generateDescription($currentPost, $pageType);
         $canonical = self::getCanonicalUrl($currentPost);

@@ -8,26 +8,17 @@
 
 defined('CMS_ROOT') or die('Direct access not allowed');
 
-/**
- * Get theme settings
- */
 function flavor_get_settings(): array
 {
     return getOption('theme_settings_flavor', []);
 }
 
-/**
- * Enqueue Google Fonts
- */
 Plugin::addAction('vf_head', function() {
     echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
     echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
     echo '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">';
 }, 5);
 
-/**
- * Add custom CSS variables from theme settings
- */
 Plugin::addAction('vf_head', function() {
     $settings = flavor_get_settings();
     $accentColor = $settings['accent_color'] ?? '#6366f1';
@@ -53,9 +44,6 @@ Plugin::addAction('vf_head', function() {
     </style>';
 }, 20);
 
-/**
- * Adjust color brightness
- */
 function flavor_adjust_brightness(string $hex, int $percent): string
 {
     $hex = ltrim($hex, '#');
@@ -75,9 +63,6 @@ function flavor_adjust_brightness(string $hex, int $percent): string
     return sprintf('#%02x%02x%02x', $r, $g, $b);
 }
 
-/**
- * Convert hex to rgba
- */
 function flavor_hex_to_rgba(string $hex, float $alpha): string
 {
     $hex = ltrim($hex, '#');
@@ -93,9 +78,6 @@ function flavor_hex_to_rgba(string $hex, float $alpha): string
     return "rgba($r, $g, $b, $alpha)";
 }
 
-/**
- * Get excerpt with custom length
- */
 function flavor_excerpt(array $post, int $length = 160): string
 {
     $content = $post['content'] ?? '';
@@ -118,9 +100,6 @@ function flavor_excerpt(array $post, int $length = 160): string
     return substr($content, 0, $length) . '…';
 }
 
-/**
- * Get reading time
- */
 function flavor_reading_time(array $post): int
 {
     $content = $post['content'] ?? '';
@@ -136,53 +115,35 @@ function flavor_reading_time(array $post): int
     return $minutes;
 }
 
-/**
- * Format date
- */
 function flavor_date(string $date): string
 {
     return date('M j, Y', strtotime($date));
 }
 
-/**
- * Check if we should show entry title
- */
 function flavor_show_entry_title(): bool
 {
     $settings = flavor_get_settings();
     return ($settings['show_entry_title'] ?? true) !== false;
 }
 
-/**
- * Check if we should show entry meta
- */
 function flavor_show_entry_meta(): bool
 {
     $settings = flavor_get_settings();
     return ($settings['show_entry_meta'] ?? true) !== false;
 }
 
-/**
- * Check if we should show author
- */
 function flavor_show_author(): bool
 {
     $settings = flavor_get_settings();
     return ($settings['show_author'] ?? true) !== false;
 }
 
-/**
- * Check if we should show date
- */
 function flavor_show_date(): bool
 {
     $settings = flavor_get_settings();
     return ($settings['show_date'] ?? true) !== false;
 }
 
-/**
- * Render a single comment with replies
- */
 function flavor_render_comment(array $comment, int $depth = 0): void
 {
     $maxDepth = (int) getOption('comment_max_depth', 3);
@@ -223,7 +184,6 @@ function flavor_render_comment(array $comment, int $depth = 0): void
         </div>
     </div>
     <?php
-    // Render replies recursively
     if (!empty($comment['replies'])) {
         foreach ($comment['replies'] as $reply) {
             flavor_render_comment($reply, $depth + 1);
@@ -231,9 +191,6 @@ function flavor_render_comment(array $comment, int $depth = 0): void
     }
 }
 
-/**
- * Format time ago
- */
 function flavor_time_ago(string $datetime): string
 {
     $time = strtotime($datetime);

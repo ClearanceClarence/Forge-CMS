@@ -21,9 +21,6 @@ class RestAPI
         'auth' => ['requests' => 10, 'window' => 300],        // 10/5min for auth attempts
     ];
 
-    /**
-     * Initialize REST API - register all routes
-     */
     public static function init(): void
     {
         if (self::$initialized) {
@@ -33,28 +30,18 @@ class RestAPI
         // Ensure API keys table exists
         self::ensureTable();
 
-        // Register authentication filter
         Plugin::addFilter('rest_authentication_errors', [self::class, 'authenticateRequest'], 10, 2);
         
-        // Register rate limiting filter
         Plugin::addFilter('rest_pre_dispatch', [self::class, 'checkRateLimit'], 10, 3);
 
-        // Register all routes on rest_api_init
         Plugin::addAction('rest_api_init', [self::class, 'registerRoutes']);
 
         self::$initialized = true;
     }
 
-    /**
-     * Register all API routes
-     */
     public static function registerRoutes(): void
     {
         $namespace = 'v1';
-
-        // =====================================================================
-        // Posts Endpoints
-        // =====================================================================
         
         Plugin::registerRestRoute($namespace, 'posts', [
             'methods' => ['GET'],
@@ -86,10 +73,6 @@ class RestAPI
             'permission_callback' => [self::class, 'canDeletePost'],
         ]);
 
-        // =====================================================================
-        // Pages Endpoints
-        // =====================================================================
-
         Plugin::registerRestRoute($namespace, 'pages', [
             'methods' => ['GET'],
             'callback' => [self::class, 'getPages'],
@@ -120,10 +103,6 @@ class RestAPI
             'permission_callback' => [self::class, 'canDeletePage'],
         ]);
 
-        // =====================================================================
-        // Custom Post Types Endpoints
-        // =====================================================================
-
         Plugin::registerRestRoute($namespace, 'types', [
             'methods' => ['GET'],
             'callback' => [self::class, 'getPostTypes'],
@@ -147,10 +126,6 @@ class RestAPI
             'callback' => [self::class, 'createPostByType'],
             'permission_callback' => [self::class, 'canCreatePosts'],
         ]);
-
-        // =====================================================================
-        // Media Endpoints
-        // =====================================================================
 
         Plugin::registerRestRoute($namespace, 'media', [
             'methods' => ['GET'],
@@ -181,10 +156,6 @@ class RestAPI
             'callback' => [self::class, 'deleteMedia'],
             'permission_callback' => [self::class, 'canDeleteMedia'],
         ]);
-
-        // =====================================================================
-        // Users Endpoints
-        // =====================================================================
 
         Plugin::registerRestRoute($namespace, 'users', [
             'methods' => ['GET'],
@@ -222,10 +193,6 @@ class RestAPI
             'permission_callback' => [self::class, 'canDeleteUser'],
         ]);
 
-        // =====================================================================
-        // Comments Endpoints
-        // =====================================================================
-
         Plugin::registerRestRoute($namespace, 'comments', [
             'methods' => ['GET'],
             'callback' => [self::class, 'getComments'],
@@ -255,10 +222,6 @@ class RestAPI
             'callback' => [self::class, 'deleteComment'],
             'permission_callback' => [self::class, 'canModerateComments'],
         ]);
-
-        // =====================================================================
-        // Taxonomies & Terms Endpoints
-        // =====================================================================
 
         Plugin::registerRestRoute($namespace, 'taxonomies', [
             'methods' => ['GET'],
@@ -302,10 +265,6 @@ class RestAPI
             'permission_callback' => [self::class, 'canManageTaxonomies'],
         ]);
 
-        // =====================================================================
-        // Menus Endpoints
-        // =====================================================================
-
         Plugin::registerRestRoute($namespace, 'menus', [
             'methods' => ['GET'],
             'callback' => [self::class, 'getMenus'],
@@ -342,10 +301,6 @@ class RestAPI
             'permission_callback' => [self::class, 'canManageMenus'],
         ]);
 
-        // =====================================================================
-        // Settings/Options Endpoints (Admin only)
-        // =====================================================================
-
         Plugin::registerRestRoute($namespace, 'settings', [
             'methods' => ['GET'],
             'callback' => [self::class, 'getSettings'],
@@ -364,19 +319,11 @@ class RestAPI
             'permission_callback' => [self::class, 'isAdmin'],
         ]);
 
-        // =====================================================================
-        // Search Endpoint
-        // =====================================================================
-
         Plugin::registerRestRoute($namespace, 'search', [
             'methods' => ['GET'],
             'callback' => [self::class, 'search'],
             'permission_callback' => null,
         ]);
-
-        // =====================================================================
-        // System Info Endpoint
-        // =====================================================================
 
         Plugin::registerRestRoute($namespace, 'info', [
             'methods' => ['GET'],
@@ -388,16 +335,8 @@ class RestAPI
         Plugin::doAction('rest_api_register_routes', $namespace);
     }
 
-    // =========================================================================
-    // Authentication
-    // =========================================================================
-
-    /**
-     * Authenticate API request via Bearer token
-     */
     public static function authenticateRequest(?string $error, string $path): ?string
     {
-        // Check for Authorization header
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
         
         if (empty($authHeader)) {
@@ -417,12 +356,10 @@ class RestAPI
             return 'Invalid API key';
         }
 
-        // Check if key is active
         if (!$apiKey['is_active']) {
             return 'API key is disabled';
         }
 
-        // Check expiration
         if ($apiKey['expires_at'] && strtotime($apiKey['expires_at']) < time()) {
             return 'API key has expired';
         }
@@ -436,17 +373,11 @@ class RestAPI
         return null; // Authentication successful
     }
 
-    /**
-     * Get current authenticated API key
-     */
     public static function getCurrentApiKey(): ?array
     {
         return self::$currentApiKey;
     }
 
-    /**
-     * Get current authenticated user (from API key or session)
-     */
     public static function getCurrentUserId(): ?int
     {
         if (self::$currentApiKey) {
@@ -457,13 +388,6 @@ class RestAPI
         return $user ? (int)$user['id'] : null;
     }
 
-    // =========================================================================
-    // Rate Limiting
-    // =========================================================================
-
-    /**
-     * Check rate limit before processing request
-     */
     public static function checkRateLimit(?array $error, string $path, array $config): ?array
     {
         $method = $_SERVER['REQUEST_METHOD'];
@@ -519,10 +443,6 @@ class RestAPI
             [$key, $expires]
         );
     }
-
-    // =========================================================================
-    // Permission Callbacks
-    // =========================================================================
 
     public static function isAuthenticated(): bool
     {
@@ -723,10 +643,6 @@ class RestAPI
         return null;
     }
 
-    // =========================================================================
-    // Posts Endpoints
-    // =========================================================================
-
     public static function getPosts(array $params): array
     {
         $args = self::parseQueryArgs([
@@ -815,10 +731,6 @@ class RestAPI
         return ['deleted' => true, 'id' => (int)$params['id']];
     }
 
-    // =========================================================================
-    // Pages Endpoints
-    // =========================================================================
-
     public static function getPages(array $params): array
     {
         $args = self::parseQueryArgs([
@@ -901,10 +813,6 @@ class RestAPI
         return ['deleted' => true, 'id' => (int)$params['id']];
     }
 
-    // =========================================================================
-    // Custom Post Types Endpoints
-    // =========================================================================
-
     public static function getPostTypes(array $params): array
     {
         $types = Post::getTypes();
@@ -973,10 +881,6 @@ class RestAPI
 
         return self::preparePost($post, true);
     }
-
-    // =========================================================================
-    // Media Endpoints
-    // =========================================================================
 
     public static function getMedia(array $params): array
     {
@@ -1053,10 +957,6 @@ class RestAPI
 
         return ['deleted' => true, 'id' => (int)$params['id']];
     }
-
-    // =========================================================================
-    // Users Endpoints
-    // =========================================================================
 
     public static function getUsers(array $params): array
     {
@@ -1169,10 +1069,6 @@ class RestAPI
         return ['deleted' => true, 'id' => (int)$params['id']];
     }
 
-    // =========================================================================
-    // Comments Endpoints
-    // =========================================================================
-
     public static function getComments(array $params): array
     {
         if (!Comment::tableExists()) {
@@ -1234,7 +1130,6 @@ class RestAPI
             $data['user_id'] = $userId;
         }
 
-        // Set IP
         $data['author_ip'] = $_SERVER['REMOTE_ADDR'] ?? '';
 
         $errors = Comment::validate($data);
@@ -1242,7 +1137,6 @@ class RestAPI
             throw new Exception(implode(', ', $errors), 400);
         }
 
-        // Check if comments are open on post
         $post = Post::find($data['post_id'] ?? 0);
         if (!$post) {
             throw new Exception('Post not found', 404);
@@ -1252,7 +1146,6 @@ class RestAPI
             throw new Exception('Comments are closed on this post', 403);
         }
 
-        // Set status based on settings
         $data['status'] = getOption('comment_moderation', true) ? 'pending' : 'approved';
 
         $id = Comment::create($data);
@@ -1299,10 +1192,6 @@ class RestAPI
 
         return ['deleted' => true, 'id' => (int)$params['id']];
     }
-
-    // =========================================================================
-    // Taxonomies & Terms Endpoints
-    // =========================================================================
 
     public static function getTaxonomies(array $params): array
     {
@@ -1400,10 +1289,6 @@ class RestAPI
         return ['deleted' => true, 'id' => (int)$params['id']];
     }
 
-    // =========================================================================
-    // Menus Endpoints
-    // =========================================================================
-
     public static function getMenus(array $params): array
     {
         $menus = Menu::getAll();
@@ -1474,10 +1359,6 @@ class RestAPI
         return ['deleted' => true, 'id' => (int)$params['id']];
     }
 
-    // =========================================================================
-    // Settings Endpoints
-    // =========================================================================
-
     public static function getSettings(array $params): array
     {
         // Only return safe, public settings
@@ -1521,10 +1402,6 @@ class RestAPI
         ];
     }
 
-    // =========================================================================
-    // Search Endpoint
-    // =========================================================================
-
     public static function search(array $params): array
     {
         $query = $_GET['q'] ?? $_GET['query'] ?? '';
@@ -1551,10 +1428,6 @@ class RestAPI
         ];
     }
 
-    // =========================================================================
-    // System Info Endpoint
-    // =========================================================================
-
     public static function getInfo(array $params): array
     {
         return [
@@ -1580,10 +1453,6 @@ class RestAPI
         ];
     }
 
-    // =========================================================================
-    // Data Preparation Methods
-    // =========================================================================
-
     private static function preparePost(array $post, bool $full = false): array
     {
         $prepared = [
@@ -1608,8 +1477,7 @@ class RestAPI
             $prepared['featured_image'] = Post::getFeaturedImage($post);
             $prepared['meta'] = self::getPostMeta($post['id']);
             
-            // Get taxonomies
-            $taxonomies = Taxonomy::getForPostType($post['post_type']);
+                $taxonomies = Taxonomy::getForPostType($post['post_type']);
             $prepared['taxonomies'] = [];
             foreach ($taxonomies as $tax) {
                 $terms = Taxonomy::getPostTerms($post['id'], $tax['slug']);
@@ -1750,10 +1618,6 @@ class RestAPI
         return $prepared;
     }
 
-    // =========================================================================
-    // Helper Methods
-    // =========================================================================
-
     private static function getRequestBody(): array
     {
         $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
@@ -1875,13 +1739,6 @@ class RestAPI
         return $thumbnails;
     }
 
-    // =========================================================================
-    // API Key Management
-    // =========================================================================
-
-    /**
-     * Ensure API keys table exists
-     */
     public static function ensureTable(): void
     {
         $table = Database::table('api_keys');
@@ -1916,9 +1773,6 @@ class RestAPI
         ");
     }
 
-    /**
-     * Generate a new API key for a user
-     */
     public static function generateApiKey(int $userId, string $name, ?string $expiresAt = null, ?array $permissions = null): array
     {
         self::ensureTable();
@@ -1945,9 +1799,6 @@ class RestAPI
         ];
     }
 
-    /**
-     * Validate an API key
-     */
     public static function validateApiKey(string $key): ?array
     {
         $table = Database::table('api_keys');
@@ -1959,18 +1810,12 @@ class RestAPI
         );
     }
 
-    /**
-     * Update last used timestamp
-     */
     private static function updateApiKeyLastUsed(int $keyId): void
     {
         $table = Database::table('api_keys');
         Database::update($table, ['last_used_at' => date('Y-m-d H:i:s')], 'id = ?', [$keyId]);
     }
 
-    /**
-     * Get all API keys for a user
-     */
     public static function getUserApiKeys(int $userId): array
     {
         self::ensureTable();
@@ -1983,18 +1828,12 @@ class RestAPI
         );
     }
 
-    /**
-     * Revoke an API key
-     */
     public static function revokeApiKey(int $keyId, int $userId): bool
     {
         $table = Database::table('api_keys');
         return Database::delete($table, 'id = ? AND user_id = ?', [$keyId, $userId]);
     }
 
-    /**
-     * Toggle API key active status
-     */
     public static function toggleApiKey(int $keyId, int $userId): bool
     {
         $table = Database::table('api_keys');
@@ -2004,9 +1843,6 @@ class RestAPI
         );
     }
 
-    /**
-     * Clean up expired rate limits
-     */
     public static function cleanupRateLimits(): void
     {
         $table = Database::table('api_rate_limits');
